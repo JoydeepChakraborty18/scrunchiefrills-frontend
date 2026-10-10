@@ -4,12 +4,13 @@ import Matter from "matter-js";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom"; // ✅ Import useNavigate
 import { auth, db } from "../firebase";
+import toast from "react-hot-toast"; // 🍞 Toast feedback for guest interactions
 
 // ✅ CENTRALIZED LOGIC (FIX)
 import { bubbleCards } from "../data/bubbleCards";
 import { handleBubbleDrop } from "../utils/dropLogic";
 
-export default function Bubbles() {
+export default function Bubbles({ onAuthRequired }) {
   const navigate = useNavigate(); // ✅ Initialize navigate
   const engineRef = useRef(null);
   const frameRef = useRef(null);
@@ -256,6 +257,22 @@ export default function Bubbles() {
   // 💥 POP LOGIC
   const popBubble = (e, bubble) => {
     if (e) e.stopPropagation(); 
+
+    // 🔒 GUEST GUARD: Prompt inline modal if not signed in
+    if (!auth.currentUser) {
+      toast("Sign in to pop bubbles & collect your weekly Bubble Cards! 🎀", {
+        icon: "👑",
+        id: "bubble-guest-auth",
+      });
+
+      if (typeof onAuthRequired === "function") {
+        onAuthRequired();
+      } else {
+        navigate("/login");
+      }
+      return;
+    }
+
     if (!bubble || bubble._popped || isLimitReached) return;
 
     bubble._popped = true;
@@ -418,7 +435,14 @@ export default function Bubbles() {
 
             {/* 💖 View Scrapbook button with translucent brand glow */}
             <button 
-              onClick={() => navigate("/scrapbook")}
+              onClick={() => {
+                // 🔒 GUEST GUARD: Prompt sign-in if guest taps limit scrapbook button
+                if (!auth.currentUser) {
+                  onAuthRequired?.();
+                } else {
+                  navigate("/scrapbook");
+                }
+              }}
               className="mt-5 sm:mt-6 bg-[#E02171] text-white px-6 sm:px-7 py-2.5 rounded-full font-black uppercase text-xs tracking-widest shadow-[0_0_24px_rgba(224,33,113,0.45)] hover:shadow-[0_0_32px_rgba(224,33,113,0.65)] hover:bg-[#c71761] hover:scale-105 active:scale-95 transition-all duration-300"
             >
               View Scrapbook

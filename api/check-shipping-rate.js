@@ -3,6 +3,9 @@ import path from "path";
 import dotenv from "dotenv";
 
 dotenv.config({
+  path: path.resolve(process.cwd(), ".env.local"),
+});
+dotenv.config({
   path: path.resolve(process.cwd(), ".env"),
 });
 
@@ -36,18 +39,6 @@ function roundUpRate(value) {
   return Math.ceil(toNumber(value, 0));
 }
 
-/**
- * Convert Shiprocket's ETA information into a
- * customer-facing delivery estimate.
- *
- * Priority:
- * 1. etd_hours
- * 2. estimated_delivery_days
- * 3. safe fallback
- *
- * We deliberately do not add arbitrary extra days
- * to Shiprocket's ETA.
- */
 function buildDeliveryTime(
   courier,
   fallbackMinDays,
@@ -91,14 +82,6 @@ function buildDeliveryTime(
   return `Estimated ${fallbackMinDays}–${fallbackMaxDays} days (${courierName})`;
 }
 
-/**
- * Returns the best numeric ETA available from
- * Shiprocket.
- *
- * Lower is faster.
- *
- * etd_hours is preferred because it is more precise.
- */
 function getCourierEtaHours(courier) {
   const etdHours = toNumber(
     courier?.etd_hours,
@@ -121,12 +104,6 @@ function getCourierEtaHours(courier) {
   return null;
 }
 
-/**
- * Compare two courier ETAs.
- *
- * Returns true only when courierA is actually faster
- * than courierB and both have usable ETA information.
- */
 function isCourierFaster(courierA, courierB) {
   const etaA = getCourierEtaHours(courierA);
   const etaB = getCourierEtaHours(courierB);
@@ -195,21 +172,57 @@ async function getShiprocketToken() {
 }
 
 /* -------------------------------------------------------
-   API Handler
+   Unified Handler (Netlify Serverless + Local Express)
 ------------------------------------------------------- */
 
 export default async function handler(
-  req,
-  res
+  eventOrReq,
+  contextOrRes
 ) {
-  if (req.method !== "POST") {
-    return res.status(405).json({
+  const isNetlify =
+    !eventOrReq.method ||
+    typeof contextOrRes?.status !== "function";
+
+  const httpMethod =
+    eventOrReq.httpMethod || eventOrReq.method;
+
+  const sendResponse = (statusCode, payload) => {
+    if (!isNetlify) {
+      return contextOrRes.status(statusCode).json(payload);
+    }
+    return {
+      statusCode,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type",
+      },
+      body: JSON.stringify(payload),
+    };
+  };
+
+  if (httpMethod === "OPTIONS") {
+    return sendResponse(200, {});
+  }
+
+  if (httpMethod !== "POST") {
+    return sendResponse(405, {
       serviceable: false,
       message: "Method not allowed.",
     });
   }
 
   try {
+    let body = eventOrReq.body;
+    if (typeof body === "string") {
+      try {
+        body = JSON.parse(body);
+      } catch {
+        body = {};
+      }
+    }
+    body = body || {};
+
     const {
       deliveryPinCode,
       weight,
@@ -217,7 +230,7 @@ export default async function handler(
       breadth,
       height,
       subtotal,
-    } = req.body || {};
+    } = body;
 
     const cleanDeliveryPinCode =
       String(deliveryPinCode || "")
@@ -228,7 +241,7 @@ export default async function handler(
         cleanDeliveryPinCode
       )
     ) {
-      return res.status(400).json({
+      return sendResponse(400, {
         serviceable: false,
         message:
           "Please enter a valid 6-digit PIN code.",
@@ -293,80 +306,43 @@ export default async function handler(
 
     let response;
 
+    const serviceabilityParams = {
+      pickup_postcode: pickupPinCode,
+      delivery_postcode: cleanDeliveryPinCode,
+      weight: safeWeight,
+      cod: 0,
+      length: safeLength,
+      breadth: safeBreadth,
+      height: safeHeight,
+    };
+
     try {
       response = await axios.get(
         SHIPROCKET_SERVICEABILITY_URL,
         {
-          params: {
-            pickup_postcode:
-              pickupPinCode,
-
-            delivery_postcode:
-              cleanDeliveryPinCode,
-
-            weight: safeWeight,
-
-            cod: 0,
-
-            length: safeLength,
-
-            breadth: safeBreadth,
-
-            height: safeHeight,
-          },
-
+          params: serviceabilityParams,
           headers: {
-            Authorization:
-              `Bearer ${token}`,
+            Authorization: `Bearer ${token}`,
           },
-
           timeout: 20000,
         }
       );
     } catch (error) {
-      /*
-       * If Shiprocket rejects the token,
-       * clear the cache and retry once.
-       */
-      const status =
-        error?.response?.status;
+      const status = error?.response?.status;
 
-      if (
-        status === 401 ||
-        status === 403
-      ) {
+      if (status === 401 || status === 403) {
         cachedToken = null;
         cachedTokenAt = 0;
 
-        token =
-          await getShiprocketToken();
+        token = await getShiprocketToken();
 
         response = await axios.get(
           SHIPROCKET_SERVICEABILITY_URL,
           {
-            params: {
-              pickup_postcode:
-                pickupPinCode,
-
-              delivery_postcode:
-                cleanDeliveryPinCode,
-
-              weight: safeWeight,
-
-              cod: 0,
-
-              length: safeLength,
-
-              breadth: safeBreadth,
-
-              height: safeHeight,
-            },
-
+            params: serviceabilityParams,
             headers: {
-              Authorization:
-                `Bearer ${token}`,
+              Authorization: `Bearer ${token}`,
             },
-
             timeout: 20000,
           }
         );
@@ -376,106 +352,20 @@ export default async function handler(
     }
 
     const availableCouriers =
-      response?.data
-        ?.data
-        ?.available_courier_companies ||
-      [];
-
-    /* ---------------------------------------------------
-       Debug logging
-    --------------------------------------------------- */
-
-    console.log(
-      "\n========== SHIPROCKET SERVICEABILITY =========="
-    );
-
-    console.log(
-      "HTTP Status:",
-      response?.status
-    );
-
-    console.log(
-      "Request:",
-      JSON.stringify(
-        {
-          pickup_postcode:
-            pickupPinCode,
-
-          delivery_postcode:
-            cleanDeliveryPinCode,
-
-          weight: safeWeight,
-
-          cod: 0,
-
-          length: safeLength,
-
-          breadth: safeBreadth,
-
-          height: safeHeight,
-        },
-        null,
-        2
-      )
-    );
-
-    console.log(
-      "Courier Count:",
-      availableCouriers.length
-    );
-
-    console.log(
-      "Couriers:",
-      JSON.stringify(
-        availableCouriers.map(
-          (courier) => ({
-            courier_name:
-              courier?.courier_name,
-
-            courier_company_id:
-              courier?.courier_company_id,
-
-            rate:
-              courier?.rate,
-
-            etd_hours:
-              courier?.etd_hours,
-
-            estimated_delivery_days:
-              courier
-                ?.estimated_delivery_days,
-
-            is_surface:
-              courier?.is_surface,
-          })
-        ),
-        null,
-        2
-      )
-    );
-
-    console.log(
-      "================================================"
-    );
+      response?.data?.data?.available_courier_companies || [];
 
     /* ---------------------------------------------------
        No couriers
     --------------------------------------------------- */
 
     if (!availableCouriers.length) {
-      return res.status(200).json({
+      return sendResponse(200, {
         serviceable: false,
-
         isWestBengal,
-
         isFreeShipping: false,
-
         freeShippingThreshold,
-
         options: {},
-
-        message:
-          "This PIN code is currently not serviceable.",
+        message: "This PIN code is currently not serviceable.",
       });
     }
 
@@ -483,219 +373,79 @@ export default async function handler(
        Separate Surface and Air couriers
     --------------------------------------------------- */
 
-    const surfaceCouriers =
-      availableCouriers.filter(
-        (courier) =>
-          courier?.is_surface === true
-      );
+    const surfaceCouriers = availableCouriers.filter(
+      (courier) => courier?.is_surface === true
+    );
 
-    const airCouriers =
-      availableCouriers.filter(
-        (courier) =>
-          courier?.is_surface === false
-      );
-
-    /* ---------------------------------------------------
-       STANDARD
-       
-       Standard means:
-       - Surface only
-       - Cheapest available Surface courier
-       
-       We NEVER use Air as a Standard fallback.
-       --------------------------------------------------- */
+    const airCouriers = availableCouriers.filter(
+      (courier) => courier?.is_surface === false
+    );
 
     const sortedSurfaceCouriers = [
       ...surfaceCouriers,
     ].sort(
       (a, b) =>
-        toNumber(a?.rate) -
-        toNumber(b?.rate)
+        toNumber(a?.rate) - toNumber(b?.rate)
     );
 
     const standardCourier =
-      sortedSurfaceCouriers[0] ||
-      null;
-
-    /* ---------------------------------------------------
-       AIR COURIERS
-       
-       We sort Air couriers by ETA first because
-       Express is speed-based.
-       
-       If multiple Air couriers have the same ETA,
-       the cheaper one wins.
-       --------------------------------------------------- */
+      sortedSurfaceCouriers[0] || null;
 
     const sortedAirCouriers = [
       ...airCouriers,
     ].sort((a, b) => {
-      const etaA =
-        getCourierEtaHours(a);
+      const etaA = getCourierEtaHours(a);
+      const etaB = getCourierEtaHours(b);
 
-      const etaB =
-        getCourierEtaHours(b);
+      if (etaA !== null && etaB === null) return -1;
+      if (etaA === null && etaB !== null) return 1;
+      if (etaA !== null && etaB !== null && etaA !== etaB) return etaA - etaB;
 
-      /*
-       * Couriers with a known ETA are preferred
-       * over couriers without ETA information.
-       */
-      if (
-        etaA !== null &&
-        etaB === null
-      ) {
-        return -1;
-      }
-
-      if (
-        etaA === null &&
-        etaB !== null
-      ) {
-        return 1;
-      }
-
-      if (
-        etaA !== null &&
-        etaB !== null &&
-        etaA !== etaB
-      ) {
-        return etaA - etaB;
-      }
-
-      /*
-       * Same ETA -> cheapest Air courier.
-       */
-      return (
-        toNumber(a?.rate) -
-        toNumber(b?.rate)
-      );
+      return toNumber(a?.rate) - toNumber(b?.rate);
     });
 
-    /* ---------------------------------------------------
-       Determine Express courier
-       
-       Rules:
-       
-       1. If Standard exists:
-          - Find fastest Air courier.
-          - Show Express ONLY if Air is genuinely
-            faster than Standard.
-       
-       2. If Standard does not exist:
-          - Air-only destination.
-          - Fastest Air becomes Express.
-       
-       This prevents an Air courier with the SAME
-       ETA as Surface from being misleadingly called
-       "Express".
-       --------------------------------------------------- */
-
     let expressCourier = null;
-
     const fastestAirCourier =
-      sortedAirCouriers[0] ||
-      null;
+      sortedAirCouriers[0] || null;
 
-    if (
-      fastestAirCourier &&
-      standardCourier
-    ) {
+    if (fastestAirCourier && standardCourier) {
       if (
-        isCourierFaster(
-          fastestAirCourier,
-          standardCourier
-        )
+        isCourierFaster(fastestAirCourier, standardCourier)
       ) {
-        expressCourier =
-          fastestAirCourier;
+        expressCourier = fastestAirCourier;
       }
-    } else if (
-      fastestAirCourier &&
-      !standardCourier
-    ) {
-      /*
-       * Express-only destination.
-       *
-       * Since no Surface courier exists, the fastest
-       * available Air courier becomes Express.
-       */
-      expressCourier =
-        fastestAirCourier;
+    } else if (fastestAirCourier && !standardCourier) {
+      expressCourier = fastestAirCourier;
     }
-
-    /* ---------------------------------------------------
-       Free Standard Shipping
-       
-       Free shipping ONLY exists when:
-       - Standard actually exists
-       - Subtotal reaches threshold
-       --------------------------------------------------- */
 
     const isFreeShipping =
       Boolean(standardCourier) &&
-      safeSubtotal >=
-        freeShippingThreshold;
+      safeSubtotal >= freeShippingThreshold;
 
     const options = {};
+    let standardRawRate = null;
 
     /* ---------------------------------------------------
        STANDARD OPTION
     --------------------------------------------------- */
 
-    let standardRawRate = null;
-
     if (standardCourier) {
-      standardRawRate =
-        toNumber(
-          standardCourier.rate,
-          0
-        );
+      standardRawRate = toNumber(standardCourier.rate, 0);
 
-      const standardRate =
-        isFreeShipping
-          ? 0
-          : roundUpRate(
-              standardRawRate
-            );
+      const standardRate = isFreeShipping
+        ? 0
+        : roundUpRate(standardRawRate);
 
       options.standard = {
-        id:
-          standardCourier
-            .courier_company_id ||
-          "standard",
-
+        id: standardCourier.courier_company_id || "standard",
         label: "Standard",
-
-        courierName:
-          standardCourier
-            .courier_name ||
-          "Standard Delivery",
-
-        courierCompanyId:
-          standardCourier
-            .courier_company_id ||
-          null,
-
+        courierName: standardCourier.courier_name || "Standard Delivery",
+        courierCompanyId: standardCourier.courier_company_id || null,
         rate: standardRate,
-
-        rawRate:
-          standardRawRate,
-
-        deliveryTime:
-          buildDeliveryTime(
-            standardCourier,
-            3,
-            5
-          ),
-
-        isSurface:
-          standardCourier
-            .is_surface === true,
-
-        isAir:
-          standardCourier
-            .is_surface === false,
-
+        rawRate: standardRawRate,
+        deliveryTime: buildDeliveryTime(standardCourier, 3, 5),
+        isSurface: standardCourier.is_surface === true,
+        isAir: standardCourier.is_surface === false,
         isFallbackAir: false,
       };
     }
@@ -705,221 +455,64 @@ export default async function handler(
     --------------------------------------------------- */
 
     if (expressCourier) {
-      const expressRawRate =
-        toNumber(
-          expressCourier.rate,
-          0
-        );
-
+      const expressRawRate = toNumber(expressCourier.rate, 0);
       let expressRate;
 
-      if (
-        standardCourier &&
-        isFreeShipping
-      ) {
-        /*
-         * Standard is free.
-         *
-         * Express becomes a paid upgrade.
-         *
-         * We charge the Air rate minus the original
-         * Standard rate, with a minimum ₹21 upgrade.
-         */
-        expressRate =
-          Math.max(
-            21,
-            roundUpRate(
-              expressRawRate -
-                toNumber(
-                  standardRawRate,
-                  0
-                )
-            )
-          );
-      } else {
-        /*
-         * Normal paid shipping OR Express-only
-         * destination.
-         *
-         * Express-only destinations pay the full
-         * Shiprocket Air rate.
-         */
-        expressRate =
+      if (standardCourier && isFreeShipping) {
+        expressRate = Math.max(
+          21,
           roundUpRate(
-            expressRawRate
-          );
+            expressRawRate - toNumber(standardRawRate, 0)
+          )
+        );
+      } else {
+        expressRate = roundUpRate(expressRawRate);
       }
 
       options.express = {
-        id:
-          expressCourier
-            .courier_company_id ||
-          "express",
-
+        id: expressCourier.courier_company_id || "express",
         label: "Express",
-
-        courierName:
-          expressCourier
-            .courier_name ||
-          "Express Delivery",
-
-        courierCompanyId:
-          expressCourier
-            .courier_company_id ||
-          null,
-
+        courierName: expressCourier.courier_name || "Express Delivery",
+        courierCompanyId: expressCourier.courier_company_id || null,
         rate: expressRate,
-
-        rawRate:
-          expressRawRate,
-
-        deliveryTime:
-          buildDeliveryTime(
-            expressCourier,
-            1,
-            3
-          ),
-
-        isSurface:
-          expressCourier
-            .is_surface === true,
-
-        isAir:
-          expressCourier
-            .is_surface === false,
-
+        rawRate: expressRawRate,
+        deliveryTime: buildDeliveryTime(expressCourier, 1, 3),
+        isSurface: expressCourier.is_surface === true,
+        isAir: expressCourier.is_surface === false,
         isFallbackAir: false,
       };
     }
 
-    /* ---------------------------------------------------
-       SERVICEABILITY
-       
-       Serviceable means at least one legitimate
-       shipping option exists.
-       
-       Possible outcomes:
-       
-       Surface + faster Air
-         -> Standard + Express
-       
-       Surface + Air same/slower
-         -> Standard only
-       
-       Surface only
-         -> Standard only
-       
-       Air only
-         -> Express only
-       
-       Neither
-         -> Unserviceable
-       --------------------------------------------------- */
-
-    const serviceable =
-      Boolean(
-        options.standard ||
-        options.express
-      );
+    const serviceable = Boolean(options.standard || options.express);
 
     if (!serviceable) {
-      return res.status(200).json({
+      return sendResponse(200, {
         serviceable: false,
-
         isWestBengal,
-
         isFreeShipping: false,
-
         freeShippingThreshold,
-
         options: {},
-
-        message:
-          "This PIN code is currently not serviceable.",
+        message: "This PIN code is currently not serviceable.",
       });
     }
 
-    /* ---------------------------------------------------
-       Additional debug information
-       
-       These fields are useful during development and
-       do not affect Checkout's existing logic.
-       --------------------------------------------------- */
-
-    console.log(
-      "Selected Standard:",
-      standardCourier
-        ? {
-            courier:
-              standardCourier.courier_name,
-
-            rate:
-              standardCourier.rate,
-
-            etaHours:
-              getCourierEtaHours(
-                standardCourier
-              ),
-          }
-        : null
-    );
-
-    console.log(
-      "Selected Express:",
-      expressCourier
-        ? {
-            courier:
-              expressCourier.courier_name,
-
-            rate:
-              expressCourier.rate,
-
-            etaHours:
-              getCourierEtaHours(
-                expressCourier
-              ),
-          }
-        : null
-    );
-
-    /* ---------------------------------------------------
-       Final response
-    --------------------------------------------------- */
-
-    return res.status(200).json({
+    return sendResponse(200, {
       serviceable: true,
-
       isWestBengal,
-
       isFreeShipping,
-
       freeShippingThreshold,
-
       options,
     });
   } catch (error) {
     console.error(
       "Shiprocket shipping-rate error:",
-      error?.response?.data ||
-        error?.message ||
-        error
+      error?.response?.data || error?.message || error
     );
 
-    const status =
-      error?.response?.status ||
-      500;
-
-    return res.status(
-      status >= 400
-        ? status
-        : 500
-    ).json({
+    return sendResponse(500, {
       serviceable: false,
-
       isFreeShipping: false,
-
       options: {},
-
       message:
         "We couldn't check shipping availability right now. Please try again.",
     });

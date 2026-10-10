@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Sparkles, Lock, Mail, ArrowRight } from "lucide-react";
-import { auth } from "../firebase";
+import { auth, db } from "../firebase";
 import { 
   GoogleAuthProvider,
   signInWithPopup, 
@@ -10,6 +10,7 @@ import {
   updateProfile,
   getAdditionalUserInfo
 } from "firebase/auth";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import toast from "react-hot-toast";
 
 // Non-blocking helper to trigger the welcome email
@@ -40,20 +41,49 @@ const AuthModal = ({ isOpen, onClose, onSuccess }) => {
     setLoading(true);
     try {
       const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: "select_account" });
+
       const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      // Ensure customer profile document exists in Firestore
+      if (user?.uid) {
+        try {
+          const userDocRef = doc(db, "customers", user.uid);
+          const docSnap = await getDoc(userDocRef);
+
+          if (!docSnap.exists()) {
+            await setDoc(userDocRef, {
+              customerName: user.displayName || "Scrunchiefriller",
+              email: user.email || "",
+              phone: user.phoneNumber || "",
+              createdAt: serverTimestamp(),
+            });
+          }
+        } catch (dbErr) {
+          console.warn("Firestore customer profile sync notice:", dbErr);
+        }
+      }
       
-      // Dispatch welcome email only if this is a first-time account registration
       const additionalInfo = getAdditionalUserInfo(result);
       if (additionalInfo?.isNewUser) {
-        sendWelcomeEmail(result.user.email, result.user.displayName);
+        sendWelcomeEmail(user.email, user.displayName);
       }
 
-      toast.success("Welcome to the Frill Club! 💖");
+      toast.success("Welcome to the Frill Club! 🎀");
       onSuccess?.();
       onClose();
     } catch (err) {
       console.error("Google Auth Error:", err);
-      toast.error(err.message || "Failed to sign in with Google.");
+      if (err.code === "auth/popup-closed-by-user") {
+        toast("Sign in cancelled", { icon: "🎀" });
+      } else if (err.code === "auth/unauthorized-domain") {
+        toast.error("Please add this domain to Firebase Authentication Authorized Domains.");
+      } else if (err.code === "auth/cancelled-popup-request") {
+        // Ignored duplicate popup triggers
+      } else {
+        toast.error(err.message || "Failed to sign in with Google.");
+      }
     } finally {
       setLoading(false);
     }
@@ -78,13 +108,22 @@ const AuthModal = ({ isOpen, onClose, onSuccess }) => {
           displayName: formData.name.trim(),
         });
 
-        // Dispatch welcome email for email/password registration
-        sendWelcomeEmail(formData.email.trim(), formData.name.trim());
+        // Ensure customer document exists in Firestore
+        try {
+          await setDoc(doc(db, "customers", userCredential.user.uid), {
+            customerName: formData.name.trim(),
+            email: formData.email.trim(),
+            createdAt: serverTimestamp(),
+          });
+        } catch (dbErr) {
+          console.warn("Firestore customer creation notice:", dbErr);
+        }
 
-        toast.success("Account created! Welcome, Scrunchiefriller! 💖");
+        sendWelcomeEmail(formData.email.trim(), formData.name.trim());
+        toast.success("Account created! Welcome, Scrunchiefriller! 🎀");
       } else {
         await signInWithEmailAndPassword(auth, formData.email.trim(), formData.password);
-        toast.success("Welcome back! 🎀");
+        toast.success("Welcome back! 🌸");
       }
       onSuccess?.();
       onClose();
@@ -126,13 +165,13 @@ const AuthModal = ({ isOpen, onClose, onSuccess }) => {
           {/* Heading */}
           <div className="text-center mb-5">
             <div className="w-12 h-12 rounded-2xl bg-pink-50 text-[#E02171] mx-auto flex items-center justify-center text-xl shadow-xs mb-2">
-              💖
+              👑
             </div>
             <h3 className="text-base font-black text-gray-900">
               {isSignUp ? "Join Scrunchiefrills™" : "Welcome Back!"}
             </h3>
             <p className="text-[11px] text-gray-400 font-medium mt-0.5">
-              Access your order history & saved addresses 🎀
+              Access your order history & saved addresses 💌
             </p>
           </div>
 

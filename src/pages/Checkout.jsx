@@ -411,6 +411,16 @@ const Checkout = () => {
           return;
         }
 
+        // 🛑 TRULY UNSERVICEABLE PIN CODE (Returned by Shiprocket)
+        if (res.ok && data && data.serviceable === false) {
+          setShippingDetails(null);
+          setShippingMethod(null);
+          setShippingServiceabilityError(
+            data.message || "This PIN code is currently not serviceable across our courier network."
+          );
+          return;
+        }
+
         // 🛡️ PRE-LAUNCH AUDIT SHIELD: If Shiprocket API is in sandbox/unfunded or PIN lookup fails,
         // provide a standard courier option so Razorpay compliance testers are NEVER blocked from paying.
         setShippingDetails({
