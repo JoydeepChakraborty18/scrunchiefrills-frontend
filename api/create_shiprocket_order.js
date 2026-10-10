@@ -62,18 +62,54 @@ function formatShiprocketDate(date = new Date()) {
   return `${year}-${month}-${day} ${hours}:${minutes}`;
 }
 
-export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ message: "Method Not Allowed" });
+export default async function handler(reqOrEvent, resOrContext) {
+  const isExpress = typeof resOrContext?.status === "function";
+  const isWebStandard = typeof Response !== "undefined";
+
+  const corsHeaders = {
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
+
+  const sendResponse = (statusCode, payload) => {
+    if (isExpress) {
+      return resOrContext.status(statusCode).json(payload);
+    }
+    if (isWebStandard) {
+      return new Response(JSON.stringify(payload), {
+        status: statusCode,
+        headers: corsHeaders,
+      });
+    }
+    return {
+      statusCode,
+      headers: corsHeaders,
+      body: JSON.stringify(payload),
+    };
+  };
+
+  const method = reqOrEvent?.method || reqOrEvent?.httpMethod || "POST";
+
+  if (method === "OPTIONS") {
+    return sendResponse(200, {});
   }
 
-  let body = req.body;
-  if (typeof body === "string") {
-    try {
-      body = JSON.parse(body);
-    } catch {
-      body = {};
+  if (method !== "POST") {
+    return sendResponse(405, { message: "Method Not Allowed" });
+  }
+
+  let body = {};
+  try {
+    if (typeof reqOrEvent?.json === "function") {
+      body = await reqOrEvent.json();
+    } else if (typeof reqOrEvent?.body === "string") {
+      body = JSON.parse(reqOrEvent.body);
+    } else if (reqOrEvent?.body) {
+      body = reqOrEvent.body;
     }
+  } catch {
+    body = {};
   }
 
   const { 
@@ -88,7 +124,7 @@ export default async function handler(req, res) {
   // 🛡️ SHIELD: Never create real Shiprocket consignments or schedule pickups during test mode / audit
   if (!IS_PRODUCTION_LIVE) {
     console.log("🛡️ Audit Mode Active: Bypassing Shiprocket dispatch.");
-    return res.status(200).json({
+    return sendResponse(200, {
       success: true,
       message: "Order recorded in audit mode. Shiprocket dispatch bypassed.",
     });
@@ -100,7 +136,7 @@ export default async function handler(req, res) {
 
     if (!email || !password) {
       console.warn("Shiprocket credentials not configured in environment. Skipping dispatch.");
-      return res.status(200).json({ success: true, message: "Skipped: Shiprocket credentials not set." });
+      return sendResponse(200, { success: true, message: "Skipped: Shiprocket credentials not set." });
     }
 
     // 1. Authenticate with Shiprocket API
@@ -138,7 +174,6 @@ export default async function handler(req, res) {
     const cleanCustomerPin = String(customer.pinCode || "700001").replace(/\D/g, "");
     const cleanCustomerPhone = String(customer.phone || "9999999999").replace(/\D/g, "");
 
-    // Must match the exact nickname in Shiprocket panel: "Warehouse"
     const pickupLocationNickname = (
       process.env.SHIPROCKET_PICKUP_LOCATION_NAME || "Warehouse"
     ).trim();
@@ -198,7 +233,7 @@ export default async function handler(req, res) {
       }
     }
 
-    return res.status(200).json({
+    return sendResponse(200, {
       success: true,
       shiprocketOrderId: shiprocketRes.data?.order_id,
       shipmentId: shiprocketRes.data?.shipment_id,
@@ -206,7 +241,7 @@ export default async function handler(req, res) {
   } catch (error) {
     const errorData = error?.response?.data || error.message;
     console.error("Shiprocket Order Creation Error:", JSON.stringify(errorData, null, 2));
-    return res.status(200).json({ 
+    return sendResponse(200, { 
       success: false, 
       warning: "Order recorded in Firestore, Shiprocket dispatch pending.",
       details: errorData
