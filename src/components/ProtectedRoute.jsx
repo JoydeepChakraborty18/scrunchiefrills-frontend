@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import AuthModal from "./AuthModal";
 import toast from "react-hot-toast";
-import { Sparkles, Lock, ArrowLeft } from "lucide-react";
+import { Lock, ArrowLeft } from "lucide-react";
 
 const ProtectedRoute = ({ user, children }) => {
   const location = useLocation();
@@ -10,12 +10,12 @@ const ProtectedRoute = ({ user, children }) => {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   useEffect(() => {
+    // 💡 Notify the user with a welcoming toast, but do NOT auto-pop the modal over the card
     if (!user) {
       toast("Sign in to unlock your Frill Club rewards & games! 🎀", {
         icon: "👑",
         id: "protected-route-prompt",
       });
-      setIsAuthModalOpen(true);
     }
   }, [user, location.pathname]);
 
@@ -24,7 +24,7 @@ const ProtectedRoute = ({ user, children }) => {
     return children;
   }
 
-  // 🌸 If user is a guest, show an inviting branded interstitial with AuthModal
+  // 🌸 If user is a guest, display the clean "Members Only Area" interstitial card
   return (
     <div className="min-h-screen w-full bg-[#FFF5F8] flex flex-col items-center justify-center px-4 py-20 text-center select-none">
       <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-pink-100 shadow-xl space-y-5">
@@ -42,6 +42,7 @@ const ProtectedRoute = ({ user, children }) => {
         </div>
 
         <div className="space-y-2.5 pt-2">
+          {/* Clicking this button cleanly opens AuthModal on user intent */}
           <button
             type="button"
             onClick={() => setIsAuthModalOpen(true)}
@@ -60,18 +61,11 @@ const ProtectedRoute = ({ user, children }) => {
         </div>
       </div>
 
+      {/* Floating AuthModal only appears when triggered by the user */}
       <AuthModal
         isOpen={isAuthModalOpen}
-        onClose={() => {
-          setIsAuthModalOpen(false);
-          // If the guest dismisses the modal without signing in, return safely to home
-          if (!user) {
-            navigate("/home");
-          }
-        }}
-        onSuccess={() => {
-          setIsAuthModalOpen(false);
-        }}
+        onClose={() => setIsAuthModalOpen(false)}
+        onSuccess={() => setIsAuthModalOpen(false)}
       />
     </div>
   );
