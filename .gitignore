@@ -28,13 +28,10 @@ dist-ssr
 # Environment Variables
 .env
 .env.local
-.vercel
 
-*.json
-!package*.json
-!package-lock.json
-!tsconfig*.json
-build.zip
+# Sensitive Service Account & Admin Keys
+*-firebase-adminsdk-*.json
+*adminsdk*.json
 
 # Secret API keys and data sheets
 *.csv
