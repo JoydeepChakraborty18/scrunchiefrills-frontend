@@ -29,77 +29,37 @@ const DEFAULT_PICKUP_PIN = "700008";
 
 function toNumber(value, fallback = 0) {
   const number = Number(value);
-
-  return Number.isFinite(number)
-    ? number
-    : fallback;
+  return Number.isFinite(number) ? number : fallback;
 }
 
 function roundUpRate(value) {
   return Math.ceil(toNumber(value, 0));
 }
 
-function buildDeliveryTime(
-  courier,
-  fallbackMinDays,
-  fallbackMaxDays
-) {
-  const courierName =
-    courier?.courier_name || "Courier";
-
-  const etdHours = toNumber(
-    courier?.etd_hours,
-    0
-  );
+function buildDeliveryTime(courier, fallbackMinDays, fallbackMaxDays) {
+  const courierName = courier?.courier_name || "Courier";
+  const etdHours = toNumber(courier?.etd_hours, 0);
 
   if (etdHours > 0) {
-    const estimatedDays = Math.max(
-      1,
-      Math.ceil(etdHours / 24)
-    );
-
-    return `Estimated ${estimatedDays} day${
-      estimatedDays === 1 ? "" : "s"
-    } (${courierName})`;
+    const estimatedDays = Math.max(1, Math.ceil(etdHours / 24));
+    return `Estimated ${estimatedDays} day${estimatedDays === 1 ? "" : "s"} (${courierName})`;
   }
 
-  const estimatedDeliveryDays = toNumber(
-    courier?.estimated_delivery_days,
-    0
-  );
-
+  const estimatedDeliveryDays = toNumber(courier?.estimated_delivery_days, 0);
   if (estimatedDeliveryDays > 0) {
-    const estimatedDays = Math.max(
-      1,
-      Math.ceil(estimatedDeliveryDays)
-    );
-
-    return `Estimated ${estimatedDays} day${
-      estimatedDays === 1 ? "" : "s"
-    } (${courierName})`;
+    const estimatedDays = Math.max(1, Math.ceil(estimatedDeliveryDays));
+    return `Estimated ${estimatedDays} day${estimatedDays === 1 ? "" : "s"} (${courierName})`;
   }
 
   return `Estimated ${fallbackMinDays}–${fallbackMaxDays} days (${courierName})`;
 }
 
 function getCourierEtaHours(courier) {
-  const etdHours = toNumber(
-    courier?.etd_hours,
-    0
-  );
+  const etdHours = toNumber(courier?.etd_hours, 0);
+  if (etdHours > 0) return etdHours;
 
-  if (etdHours > 0) {
-    return etdHours;
-  }
-
-  const estimatedDays = toNumber(
-    courier?.estimated_delivery_days,
-    0
-  );
-
-  if (estimatedDays > 0) {
-    return estimatedDays * 24;
-  }
+  const estimatedDays = toNumber(courier?.estimated_delivery_days, 0);
+  if (estimatedDays > 0) return estimatedDays * 24;
 
   return null;
 }
@@ -107,122 +67,105 @@ function getCourierEtaHours(courier) {
 function isCourierFaster(courierA, courierB) {
   const etaA = getCourierEtaHours(courierA);
   const etaB = getCourierEtaHours(courierB);
-
-  if (
-    etaA === null ||
-    etaB === null
-  ) {
-    return false;
-  }
-
+  if (etaA === null || etaB === null) return false;
   return etaA < etaB;
 }
 
-/* -------------------------------------------------------
-   Shiprocket Authentication
-------------------------------------------------------- */
-
 async function getShiprocketToken() {
   const now = Date.now();
-
-  if (
-    cachedToken &&
-    now - cachedTokenAt <
-      TOKEN_CACHE_DURATION_MS
-  ) {
+  if (cachedToken && now - cachedTokenAt < TOKEN_CACHE_DURATION_MS) {
     return cachedToken;
   }
 
-  const email =
-    process.env.SHIPROCKET_EMAIL;
-
-  const password =
-    process.env.SHIPROCKET_PASSWORD;
+  const email = process.env.SHIPROCKET_EMAIL;
+  const password = process.env.SHIPROCKET_PASSWORD;
 
   if (!email || !password) {
     throw new Error(
-      "Shiprocket credentials are missing. Please check SHIPROCKET_EMAIL and SHIPROCKET_PASSWORD."
+      "Shiprocket credentials are missing from environment."
     );
   }
 
   const response = await axios.post(
     SHIPROCKET_AUTH_URL,
-    {
-      email,
-      password,
-    },
-    {
-      timeout: 15000,
-    }
+    { email, password },
+    { timeout: 15000 }
   );
 
-  const token =
-    response?.data?.token;
-
+  const token = response?.data?.token;
   if (!token) {
-    throw new Error(
-      "Shiprocket authentication succeeded but no token was returned."
-    );
+    throw new Error("Shiprocket authentication failed: no token returned.");
   }
 
   cachedToken = token;
   cachedTokenAt = now;
-
   return token;
 }
 
 /* -------------------------------------------------------
-   Unified Handler (Netlify Serverless + Local Express)
+   Handler (Universal: Netlify v2, Netlify v1, & Express)
 ------------------------------------------------------- */
 
-export default async function handler(
-  eventOrReq,
-  contextOrRes
-) {
-  const isNetlify =
-    !eventOrReq.method ||
-    typeof contextOrRes?.status !== "function";
+export default async function handler(reqOrEvent, resOrContext) {
+  // 1. Detect runtime environment
+  const isExpress = typeof resOrContext?.status === "function";
+  const isWebStandard = typeof Response !== "undefined";
 
-  const httpMethod =
-    eventOrReq.httpMethod || eventOrReq.method;
+  const corsHeaders = {
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
 
   const sendResponse = (statusCode, payload) => {
-    if (!isNetlify) {
-      return contextOrRes.status(statusCode).json(payload);
+    // A. Express / local dev server
+    if (isExpress) {
+      return resOrContext.status(statusCode).json(payload);
     }
+    // B. Netlify v2 (Standard Web Response)
+    if (isWebStandard) {
+      return new Response(JSON.stringify(payload), {
+        status: statusCode,
+        headers: corsHeaders,
+      });
+    }
+    // C. Legacy Lambda object fallback
     return {
       statusCode,
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "Content-Type",
-      },
+      headers: corsHeaders,
       body: JSON.stringify(payload),
     };
   };
 
-  if (httpMethod === "OPTIONS") {
+  // 2. Parse Method
+  const method = reqOrEvent?.method || reqOrEvent?.httpMethod || "POST";
+
+  if (method === "OPTIONS") {
     return sendResponse(200, {});
   }
 
-  if (httpMethod !== "POST") {
+  if (method !== "POST") {
     return sendResponse(405, {
       serviceable: false,
       message: "Method not allowed.",
     });
   }
 
+  // 3. Parse Body (supports Web Request, Express parsed body, and Lambda string body)
+  let body = {};
   try {
-    let body = eventOrReq.body;
-    if (typeof body === "string") {
-      try {
-        body = JSON.parse(body);
-      } catch {
-        body = {};
-      }
+    if (typeof reqOrEvent?.json === "function") {
+      body = await reqOrEvent.json();
+    } else if (typeof reqOrEvent?.body === "string") {
+      body = JSON.parse(reqOrEvent.body);
+    } else if (reqOrEvent?.body) {
+      body = reqOrEvent.body;
     }
-    body = body || {};
+  } catch {
+    body = {};
+  }
 
+  try {
     const {
       deliveryPinCode,
       weight,
@@ -230,80 +173,30 @@ export default async function handler(
       breadth,
       height,
       subtotal,
-    } = body;
+    } = body || {};
 
-    const cleanDeliveryPinCode =
-      String(deliveryPinCode || "")
-        .replace(/\D/g, "");
+    const cleanDeliveryPinCode = String(deliveryPinCode || "").replace(/\D/g, "");
 
-    if (
-      !/^\d{6}$/.test(
-        cleanDeliveryPinCode
-      )
-    ) {
+    if (!/^\d{6}$/.test(cleanDeliveryPinCode)) {
       return sendResponse(400, {
         serviceable: false,
-        message:
-          "Please enter a valid 6-digit PIN code.",
+        message: "Please enter a valid 6-digit PIN code.",
       });
     }
 
-    const safeWeight = Math.max(
-      0.1,
-      toNumber(weight, 0.2)
+    const safeWeight = Math.max(0.1, toNumber(weight, 0.2));
+    const safeLength = Math.max(1, toNumber(length, 20));
+    const safeBreadth = Math.max(1, toNumber(breadth, 15));
+    const safeHeight = Math.max(1, toNumber(height, 3));
+    const safeSubtotal = Math.max(0, toNumber(subtotal, 0));
+    const pickupPinCode = DEFAULT_PICKUP_PIN;
+
+    const isWestBengal = ["70", "71", "72", "73", "74"].some((prefix) =>
+      cleanDeliveryPinCode.startsWith(prefix)
     );
+    const freeShippingThreshold = isWestBengal ? 999 : 1999;
 
-    const safeLength = Math.max(
-      1,
-      toNumber(length, 20)
-    );
-
-    const safeBreadth = Math.max(
-      1,
-      toNumber(breadth, 15)
-    );
-
-    const safeHeight = Math.max(
-      1,
-      toNumber(height, 3)
-    );
-
-    const safeSubtotal = Math.max(
-      0,
-      toNumber(subtotal, 0)
-    );
-
-    const pickupPinCode =
-      DEFAULT_PICKUP_PIN;
-
-    /* ---------------------------------------------------
-       West Bengal detection
-    --------------------------------------------------- */
-
-    const isWestBengal = [
-      "70",
-      "71",
-      "72",
-      "73",
-      "74",
-    ].some((prefix) =>
-      cleanDeliveryPinCode.startsWith(
-        prefix
-      )
-    );
-
-    const freeShippingThreshold =
-      isWestBengal
-        ? 999
-        : 1999;
-
-    /* ---------------------------------------------------
-       Shiprocket Serviceability Request
-    --------------------------------------------------- */
-
-    let token =
-      await getShiprocketToken();
-
+    let token = await getShiprocketToken();
     let response;
 
     const serviceabilityParams = {
@@ -317,35 +210,22 @@ export default async function handler(
     };
 
     try {
-      response = await axios.get(
-        SHIPROCKET_SERVICEABILITY_URL,
-        {
-          params: serviceabilityParams,
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          timeout: 20000,
-        }
-      );
+      response = await axios.get(SHIPROCKET_SERVICEABILITY_URL, {
+        params: serviceabilityParams,
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 20000,
+      });
     } catch (error) {
       const status = error?.response?.status;
-
       if (status === 401 || status === 403) {
         cachedToken = null;
         cachedTokenAt = 0;
-
         token = await getShiprocketToken();
-
-        response = await axios.get(
-          SHIPROCKET_SERVICEABILITY_URL,
-          {
-            params: serviceabilityParams,
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-            timeout: 20000,
-          }
-        );
+        response = await axios.get(SHIPROCKET_SERVICEABILITY_URL, {
+          params: serviceabilityParams,
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 20000,
+        });
       } else {
         throw error;
       }
@@ -353,10 +233,6 @@ export default async function handler(
 
     const availableCouriers =
       response?.data?.data?.available_courier_companies || [];
-
-    /* ---------------------------------------------------
-       No couriers
-    --------------------------------------------------- */
 
     if (!availableCouriers.length) {
       return sendResponse(200, {
@@ -369,49 +245,32 @@ export default async function handler(
       });
     }
 
-    /* ---------------------------------------------------
-       Separate Surface and Air couriers
-    --------------------------------------------------- */
-
     const surfaceCouriers = availableCouriers.filter(
       (courier) => courier?.is_surface === true
     );
-
     const airCouriers = availableCouriers.filter(
       (courier) => courier?.is_surface === false
     );
 
-    const sortedSurfaceCouriers = [
-      ...surfaceCouriers,
-    ].sort(
-      (a, b) =>
-        toNumber(a?.rate) - toNumber(b?.rate)
+    const sortedSurfaceCouriers = [...surfaceCouriers].sort(
+      (a, b) => toNumber(a?.rate) - toNumber(b?.rate)
     );
+    const standardCourier = sortedSurfaceCouriers[0] || null;
 
-    const standardCourier =
-      sortedSurfaceCouriers[0] || null;
-
-    const sortedAirCouriers = [
-      ...airCouriers,
-    ].sort((a, b) => {
+    const sortedAirCouriers = [...airCouriers].sort((a, b) => {
       const etaA = getCourierEtaHours(a);
       const etaB = getCourierEtaHours(b);
-
       if (etaA !== null && etaB === null) return -1;
       if (etaA === null && etaB !== null) return 1;
       if (etaA !== null && etaB !== null && etaA !== etaB) return etaA - etaB;
-
       return toNumber(a?.rate) - toNumber(b?.rate);
     });
 
     let expressCourier = null;
-    const fastestAirCourier =
-      sortedAirCouriers[0] || null;
+    const fastestAirCourier = sortedAirCouriers[0] || null;
 
     if (fastestAirCourier && standardCourier) {
-      if (
-        isCourierFaster(fastestAirCourier, standardCourier)
-      ) {
+      if (isCourierFaster(fastestAirCourier, standardCourier)) {
         expressCourier = fastestAirCourier;
       }
     } else if (fastestAirCourier && !standardCourier) {
@@ -419,22 +278,14 @@ export default async function handler(
     }
 
     const isFreeShipping =
-      Boolean(standardCourier) &&
-      safeSubtotal >= freeShippingThreshold;
+      Boolean(standardCourier) && safeSubtotal >= freeShippingThreshold;
 
     const options = {};
     let standardRawRate = null;
 
-    /* ---------------------------------------------------
-       STANDARD OPTION
-    --------------------------------------------------- */
-
     if (standardCourier) {
       standardRawRate = toNumber(standardCourier.rate, 0);
-
-      const standardRate = isFreeShipping
-        ? 0
-        : roundUpRate(standardRawRate);
+      const standardRate = isFreeShipping ? 0 : roundUpRate(standardRawRate);
 
       options.standard = {
         id: standardCourier.courier_company_id || "standard",
@@ -450,10 +301,6 @@ export default async function handler(
       };
     }
 
-    /* ---------------------------------------------------
-       EXPRESS OPTION
-    --------------------------------------------------- */
-
     if (expressCourier) {
       const expressRawRate = toNumber(expressCourier.rate, 0);
       let expressRate;
@@ -461,9 +308,7 @@ export default async function handler(
       if (standardCourier && isFreeShipping) {
         expressRate = Math.max(
           21,
-          roundUpRate(
-            expressRawRate - toNumber(standardRawRate, 0)
-          )
+          roundUpRate(expressRawRate - toNumber(standardRawRate, 0))
         );
       } else {
         expressRate = roundUpRate(expressRawRate);
