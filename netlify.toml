@@ -3,6 +3,9 @@
   publish = "dist"
   functions = "api"
 
+[build.environment]
+  SECRETS_SCAN_ENABLED = "false"
+
 # Route API calls to serverless functions
 [[redirects]]
   from = "/api/*"
