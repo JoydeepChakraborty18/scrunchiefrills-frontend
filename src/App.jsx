@@ -5,6 +5,7 @@ import Navbar from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
 import MobileBottomNav from "./components/MobileBottomNav"; // 📱 Import MobileBottomNav
 import MarqueeBar from "./components/MarqueeBar"; // 🎀 Import MarqueeBar for promotional announcements
+import ScrollToTopButton from "./components/ScrollToTopButton"; // 🔝 Import ScrollToTopButton
 
 import About from "./pages/About";
 import Cart from "./pages/Cart"; // ✅ Imported Cart
@@ -182,6 +183,9 @@ function Layout() {
           />
         </Routes>
       </div>
+
+      {/* 🔝 Floating Up-Arrow Scroll to Top Button (Brand styled for mobile & desktop) */}
+      {isMainSite && <ScrollToTopButton />}
 
       {/* 📱 2. Docked Bottom Nav on all storefront routes for mobile screens */}
       {isMainSite && <MobileBottomNav />}

@@ -111,20 +111,18 @@ function Footer() {
 
             <p className="flex items-center gap-2">
               <Phone size={14} className="text-pink-400 flex-shrink-0" />
-              <a href="tel:+919390956923" className="hover:text-pink-400 transition font-semibold">
-                +91 9390956923
-              </a>
+              <span>+91 9030369303</span>
             </p>
 
             <p className="flex items-center gap-2">
               <Mail size={14} className="text-pink-400 flex-shrink-0" />
-              <a href="mailto:support@scrunchiefrills.com" className="hover:text-pink-400 transition font-semibold">
-                support@scrunchiefrills.com
+              <a href="mailto:hello@scrunchiefrills.com" className="hover:text-pink-400 transition font-semibold">
+                hello@scrunchiefrills.com
               </a>
             </p>
 
             <p className="text-[10px] text-gray-400 pt-1">
-              Support Hours: Mon – Sat (10:00 AM – 6:00 PM IST)
+              Operating Hours: Mon – Sat (10:00 AM – 6:00 PM IST)
             </p>
 
             {/* Instagram Social Link */}

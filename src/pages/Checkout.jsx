@@ -15,7 +15,9 @@ import {
   ShieldCheck,
   Package,
   Heart,
-  ShoppingBag
+  ShoppingBag,
+  Info,
+  X
 } from "lucide-react";
 import { auth, db } from "../firebase";
 import { doc, getDoc } from "firebase/firestore";
@@ -33,15 +35,6 @@ import { syncUserProgression } from "../utils/progressionEngine";
 /**
  * 🌸 SCRUNCHIEFRILLS™ PRODUCTION CHECKOUT COMPONENT
  * Route: /checkout
- * Coupon logic disabled to safeguard margins on top of launch offer pricing.
- *
- * Shipping behavior:
- * 1. Standard + Express available → customer can choose either.
- * 2. Standard only → Standard is selectable; Express is unavailable.
- * 3. Express/Air only → Express remains selectable; Standard is unavailable.
- * 4. Neither → checkout is blocked and the PIN is treated as unserviceable.
- *
- * Compliance: Option A (Direct checkbox agreement with clickable policy inspection).
  */
 const Checkout = () => {
   const navigate = useNavigate();
@@ -57,6 +50,7 @@ const Checkout = () => {
   const [showShippingModal, setShowShippingModal] = useState(false);
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showDiscountBreakdownModal, setShowDiscountBreakdownModal] = useState(false);
 
   // -------------------------------------------------------------
   // 1. FORM STATE
@@ -325,24 +319,18 @@ const Checkout = () => {
       : 0;
   }, [activeShippingOption]);
 
-  const launchSavings = useMemo(() => {
+  // 🧮 Explicit Total MRP Calculation
+  const totalMrp = useMemo(() => {
     return cart.reduce((acc, item) => {
-      const comparePrice = item.compareAtPrice
-        ? Number(item.compareAtPrice)
-        : 315;
-
-      const currentPrice = Number(item.price || 249);
-
-      if (comparePrice > currentPrice) {
-        return (
-          acc +
-          (comparePrice - currentPrice) * (item.quantity || 1)
-        );
-      }
-
-      return acc;
+      const comparePrice = item.compareAtPrice ? Number(item.compareAtPrice) : 315;
+      return acc + comparePrice * (item.quantity || 1);
     }, 0);
   }, [cart]);
+
+  // 🧮 Launch MRP Savings: Total MRP - Selling Price Subtotal
+  const launchSavings = useMemo(() => {
+    return Math.max(0, totalMrp - Number(subtotal || 0));
+  }, [totalMrp, subtotal]);
 
   const finalPayableTotal = Math.max(
     0,
@@ -411,7 +399,6 @@ const Checkout = () => {
           return;
         }
 
-        // 🛑 TRULY UNSERVICEABLE PIN CODE (Returned by Shiprocket)
         if (res.ok && data && data.serviceable === false) {
           setShippingDetails(null);
           setShippingMethod(null);
@@ -421,8 +408,6 @@ const Checkout = () => {
           return;
         }
 
-        // 🛡️ PRE-LAUNCH AUDIT SHIELD: If Shiprocket API is in sandbox/unfunded or PIN lookup fails,
-        // provide a standard courier option so Razorpay compliance testers are NEVER blocked from paying.
         setShippingDetails({
           serviceable: true,
           options: {
@@ -444,7 +429,6 @@ const Checkout = () => {
 
         console.warn("Shipping rate query failed:", err);
 
-        // 🛡️ Network/API Failure Fallback: Keep checkout open for auditor review
         setShippingDetails({
           serviceable: true,
           options: {
@@ -582,7 +566,6 @@ const Checkout = () => {
       return;
     }
 
-    // 🛡️ Razorpay SDK Dynamic Context Inspection
     if (!window.Razorpay) {
       toast.error(
         "Secure payment gateway is unavailable. Please refresh and try again."
@@ -905,7 +888,6 @@ const Checkout = () => {
       <div className="max-w-5xl mx-auto px-4 pt-6 pb-2">
         <div className="flex items-center justify-between gap-2 sm:gap-4 md:gap-6">
           
-          {/* 🌟 Left Sticker: "Almost there!" */}
           <div className="flex-shrink-0 flex items-center justify-center select-none pointer-events-none">
             <img
               src="/images/OrderingPage/almostThere.png"
@@ -914,9 +896,7 @@ const Checkout = () => {
             />
           </div>
 
-          {/* 📍 Central 4-Step Stepper */}
           <div className="flex-1 max-w-xl mx-auto flex items-center justify-between">
-            {/* Step 1: Cart */}
             <div
               className="flex flex-col items-center cursor-pointer"
               onClick={() => navigate("/cart")}
@@ -931,7 +911,6 @@ const Checkout = () => {
 
             <div className="h-0.5 flex-1 bg-pink-200 mx-1.5 sm:mx-2 -mt-3 sm:-mt-4" />
 
-            {/* Step 2: Details (ACTIVE) */}
             <div className="flex flex-col items-center">
               <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#E02171] text-white flex items-center justify-center text-xs font-black shadow-md">
                 <MapPin size={15} strokeWidth={2.5} />
@@ -943,7 +922,6 @@ const Checkout = () => {
 
             <div className="h-0.5 flex-1 bg-gray-200 mx-1.5 sm:mx-2 -mt-3 sm:-mt-4" />
 
-            {/* Step 3: Payment */}
             <div className="flex flex-col items-center">
               <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white border border-gray-300 text-gray-400 flex items-center justify-center text-xs font-bold">
                 💳
@@ -955,7 +933,6 @@ const Checkout = () => {
 
             <div className="h-0.5 flex-1 bg-gray-200 mx-1.5 sm:mx-2 -mt-3 sm:-mt-4" />
 
-            {/* Step 4: Complete */}
             <div className="flex flex-col items-center">
               <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white border border-gray-300 text-gray-400 flex items-center justify-center text-xs font-bold">
                 ✓
@@ -966,7 +943,6 @@ const Checkout = () => {
             </div>
           </div>
 
-          {/* 🌟 Right Sticker: "You're doing great!" */}
           <div className="flex-shrink-0 flex items-center justify-center select-none pointer-events-none">
             <img
               src="/images/OrderingPage/doingGreat.png"
@@ -988,8 +964,6 @@ const Checkout = () => {
 
           {/* SECTION 1: CONTACT INFORMATION */}
           <div className="bg-white rounded-3xl p-6 border border-pink-100 shadow-sm relative">
-            
-            {/* 👑 GUEST ACCOUNT INCENTIVE BANNER */}
             {!user && (
               <div className="mb-5 p-3.5 bg-pink-50/80 border border-pink-200 rounded-2xl flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5">
@@ -1487,7 +1461,6 @@ const Checkout = () => {
             </div>
 
             <div className="space-y-2.5 max-w-md">
-              {/* UPI */}
               <div
                 onClick={() => setPaymentOption("upi")}
                 className={`p-3.5 rounded-2xl border flex items-center gap-3 cursor-pointer transition-all ${
@@ -1524,7 +1497,6 @@ const Checkout = () => {
                 </div>
               </div>
 
-              {/* Cards */}
               <div
                 onClick={() => setPaymentOption("card")}
                 className={`p-3.5 rounded-2xl border flex items-center gap-3 cursor-pointer transition-all ${
@@ -1555,7 +1527,6 @@ const Checkout = () => {
                 </div>
               </div>
 
-              {/* Net Banking */}
               <div
                 onClick={() => setPaymentOption("netbanking")}
                 className={`p-3.5 rounded-2xl border flex items-center gap-3 cursor-pointer transition-all ${
@@ -1586,7 +1557,6 @@ const Checkout = () => {
                 </div>
               </div>
 
-              {/* Wallets */}
               <div
                 onClick={() => setPaymentOption("wallet")}
                 className={`p-3.5 rounded-2xl border flex items-center gap-3 cursor-pointer transition-all ${
@@ -1619,7 +1589,7 @@ const Checkout = () => {
             </div>
           </div>
 
-          {/* LEGAL AGREEMENT CHECKBOX & PAY BUTTON (OPTION A) */}
+          {/* LEGAL AGREEMENT CHECKBOX & PAY BUTTON */}
           <div className="space-y-4 pt-2">
             <div className="flex items-start gap-2 select-none">
               <input
@@ -1719,8 +1689,8 @@ const Checkout = () => {
         {/* RIGHT COLUMN: ORDER SUMMARY & TRUST STACK (5 Cols) */}
         <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-24">
 
-          {/* ORDER SUMMARY CARD */}
-          <div className="bg-white rounded-3xl p-6 border border-pink-100 shadow-sm">
+          {/* 🛍️ ORDER SUMMARY CARD WITH MATHEMATICALLY TRANSPARENT DISCOUNT BREAKDOWN */}
+          <div className="bg-white rounded-3xl p-6 border border-pink-100 shadow-sm text-left">
             <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-4">
               <h3 className="text-xs font-black uppercase tracking-wider text-gray-900 flex items-center gap-1.5">
                 <ShoppingBag size={14} className="text-[#E02171]" />
@@ -1754,7 +1724,7 @@ const Checkout = () => {
                     />
 
                     <div>
-                      <p className="font-black text-gray-900 leading-snug">
+                      <p className="font-black text-gray-900 leading-snug uppercase">
                         {item.name}
                       </p>
 
@@ -1776,25 +1746,45 @@ const Checkout = () => {
             </div>
 
             {/* Price Calculations */}
-            <div className="border-t border-gray-100 mt-5 pt-4 space-y-2 text-xs font-bold">
-              <div className="flex justify-between text-gray-600">
-                <span>Subtotal ({totalItemCount} items)</span>
-                <span className="text-gray-900">₹{subtotal}</span>
+            <div className="border-t border-gray-100 mt-5 pt-4 space-y-2.5 text-xs font-bold">
+              
+              {/* Row 1: Total Lot MRP */}
+              <div className="flex justify-between text-gray-500">
+                <span>Total MRP ({totalItemCount} items)</span>
+                <span className="line-through">₹{totalMrp}</span>
               </div>
 
+              {/* Row 2: Discount with See Details Trigger */}
               {launchSavings > 0 && (
                 <div className="flex justify-between text-[#E02171]">
-                  <span>Discount (LAUNCH MRP SAVINGS)</span>
+                  <div className="flex items-center gap-1.5">
+                    <span>Discount (LAUNCH MRP SAVINGS)</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowDiscountBreakdownModal(true)}
+                      className="lowercase text-[11px] underline font-bold text-gray-500 hover:text-black cursor-pointer flex items-center gap-0.5"
+                    >
+                      <Info size={11} />
+                      see details
+                    </button>
+                  </div>
                   <span>- ₹{launchSavings}</span>
                 </div>
               )}
 
+              {/* Row 3: Subtotal / Base Price */}
+              <div className="flex justify-between text-gray-700 font-bold border-t border-dashed border-gray-100 pt-2">
+                <span>Subtotal</span>
+                <span>₹{subtotal}</span>
+              </div>
+
+              {/* Row 4: Shipping Charge */}
               <div className="flex justify-between text-gray-600">
                 <span>Shipping Charge</span>
                 <span className="text-gray-900">
                   {shippingDetails && activeShippingOption ? (
                     dynamicShippingCharge === 0 ? (
-                      "FREE"
+                      <span className="text-emerald-600 font-black">FREE</span>
                     ) : (
                       `₹${dynamicShippingCharge}`
                     )
@@ -1806,7 +1796,8 @@ const Checkout = () => {
                 </span>
               </div>
 
-              <div className="border-t border-gray-200 pt-3 flex justify-between items-baseline text-gray-900">
+              {/* Row 5: Total Amount */}
+              <div className="border-t-2 border-black pt-3 flex justify-between items-baseline text-gray-900">
                 <span className="text-sm font-black uppercase">
                   Total Amount
                 </span>
@@ -1826,7 +1817,7 @@ const Checkout = () => {
           </div>
 
           {/* TRUST STACK */}
-          <div className="bg-white rounded-3xl p-5 border border-pink-100 shadow-sm space-y-3.5">
+          <div className="bg-white rounded-3xl p-5 border border-pink-100 shadow-sm space-y-3.5 text-left">
             <h4 className="text-xs font-black uppercase tracking-wider text-gray-900 flex items-center gap-1.5">
               <Sparkles size={14} className="text-[#E02171]" /> Why shop with Scrunchiefrills?
             </h4>
@@ -1883,6 +1874,85 @@ const Checkout = () => {
           </div>
         </div>
       </main>
+
+      {/* 🧾 Popover Modal: Checkout Discount Breakdown */}
+      <AnimatePresence>
+        {showDiscountBreakdownModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border-4 border-black relative text-left"
+            >
+              <button
+                onClick={() => setShowDiscountBreakdownModal(false)}
+                className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-gray-100 cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+
+              <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                <span>🎀</span> Launch Pricing Breakdown
+              </h4>
+              <p className="text-[11px] text-gray-500 mb-4">
+                During our Debut Lot Launch, every Cloud (XXL) scrunchie enjoys a flat promotional privilege!
+              </p>
+
+              <div className="space-y-3 border-y border-gray-100 py-3 text-xs">
+                {cart.map((item) => {
+                  const mrp = Number(item.compareAtPrice) || 315;
+                  const price = Number(item.price) || 249;
+                  const itemSavings = (mrp - price) * item.quantity;
+                  return (
+                    <div key={item.id} className="flex justify-between items-center">
+                      <div>
+                        <span className="font-bold text-gray-800">{item.name}</span>
+                        <span className="text-[10px] text-gray-400 block">
+                          ₹{mrp} → ₹{price} (Save ₹{mrp - price} × {item.quantity})
+                        </span>
+                      </div>
+                      <span className="font-black text-[#E02171]">- ₹{itemSavings}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="pt-3 space-y-1.5 text-xs font-black">
+                <div className="flex justify-between text-gray-500">
+                  <span>Total MRP Value:</span>
+                  <span className="line-through">₹{totalMrp}</span>
+                </div>
+                <div className="flex justify-between text-[#E02171]">
+                  <span>Total Promotional Discount:</span>
+                  <span>- ₹{launchSavings}</span>
+                </div>
+                <div className="flex justify-between text-gray-800">
+                  <span>Subtotal (Payable items):</span>
+                  <span>₹{subtotal}</span>
+                </div>
+                {dynamicShippingCharge > 0 && (
+                  <div className="flex justify-between text-gray-600">
+                    <span>Shipping:</span>
+                    <span>+ ₹{dynamicShippingCharge}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-black text-sm pt-2 border-t-2 border-black">
+                  <span>Total Payable:</span>
+                  <span className="text-[#E02171]">₹{finalPayableTotal}</span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowDiscountBreakdownModal(false)}
+                className="mt-5 w-full bg-[#E02171] text-white py-2.5 rounded-xl font-black text-xs uppercase tracking-wider hover:bg-black transition cursor-pointer"
+              >
+                Got It! 💖
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* 📜 Interactive Legal Modals */}
       <TermsModal

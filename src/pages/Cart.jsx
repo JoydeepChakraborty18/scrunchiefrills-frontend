@@ -1,59 +1,125 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Minus, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Minus, Plus, Trash2, PlusCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { useCart } from "../context/CartContext";
 import { usePricing } from "../context/PricingContext";
 import { 
   SavingsVaultPanel, 
-  CartSummaryDetailsBox as CheckoutSummaryDetailsBox 
+  CartSummaryDetailsBox as CheckoutSummaryDetailsBox,
+  FrillProgressTracker
 } from "../components/PricingWidgets";
-import { auth } from "../firebase";
+import { auth, db } from "../firebase";
+import { collection, onSnapshot } from "firebase/firestore";
 import Footer from "../sections/Footer";
 import AuthModal from "../components/AuthModal";
 import toast from "react-hot-toast";
 
+// 📂 Fallback local catalog
+import fallbackCatalog from "../data/products.json";
+
 /**
  * ✨ CART COMPONENT ✨
  * Designed for: Scrunchiefrills™ 
- * Features: Itemized List, Subtotal Calculation, Pack of 3 Rule, AuthModal & Guest Audit Access
+ * Features: Live Firestore Sheet Sync, Pack of 3 Rule, Similar Products Cross-Sell, AuthModal & Guest Access
  */
 const Cart = () => {
   const navigate = useNavigate();
-  const { cart, removeFromCart, updateQuantity } = useCart();
+  const { cart, addToCart, removeFromCart, updateQuantity } = useCart();
   const user = auth.currentUser;
   const { subtotal } = usePricing();
   const [showAuthModal, setShowAuthModal] = useState(false);
 
-  const totalScrunchiesCount = cart.reduce((acc, item) => acc + item.quantity, 0);
+  // 🔄 Real-time Firestore Collection State (Full Catalog synced from Google Sheets)
+  const [liveProductsMap, setLiveProductsMap] = useState({});
 
-  // 🧮 Pack of 3 Validation Rule
+  useEffect(() => {
+    const unsub = onSnapshot(
+      collection(db, "products"),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const map = {};
+          snapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            const key = data.id || data.sku || docSnap.id;
+            map[key] = { ...data, id: key };
+          });
+          setLiveProductsMap(map);
+        }
+      },
+      (error) => {
+        console.warn("Firestore cart catalog listener note (using local fallback):", error);
+      }
+    );
+    return () => unsub();
+  }, []);
+
+  // 🧮 Unified Catalog: Firestore Live Data merged with fallback products.json
+  const fullCatalogMap = useMemo(() => {
+    const combined = { ...fallbackCatalog, ...liveProductsMap };
+    return combined;
+  }, [liveProductsMap]);
+
+  const totalScrunchiesCount = cart.reduce((acc, item) => acc + item.quantity, 0);
   const isPackOfThreeValid = totalScrunchiesCount >= 3 && totalScrunchiesCount % 3 === 0;
-  
+
+  // 🛍️ ENTERPRISE SIMILAR PRODUCTS ALGORITHM:
+  // Handles both Array and comma-separated String representations from Google Sheet Column P
+  const recommendedProducts = useMemo(() => {
+    const cartProductKeys = new Set(
+      cart.map((item) => String(item.id || item.sku || "").trim())
+    );
+    const candidateIds = new Set();
+
+    // 1. Collect similar products referenced by active cart items
+    cart.forEach((item) => {
+      const itemKey = item.id || item.sku;
+      const fullItem = fullCatalogMap[itemKey] || item;
+
+      let rawSimilar = fullItem.similarProductIds || fullItem.similarProductId || [];
+      
+      // If stored as comma-separated string from Google Sheets (e.g. "SKU-1, SKU-2")
+      if (typeof rawSimilar === "string") {
+        rawSimilar = rawSimilar.split(",").map((s) => s.trim()).filter(Boolean);
+      }
+
+      if (Array.isArray(rawSimilar)) {
+        rawSimilar.forEach((sId) => candidateIds.add(String(sId).trim()));
+      }
+    });
+
+    // 2. Fallback: If cart is empty of relations, suggest other products in catalog
+    if (candidateIds.size === 0) {
+      Object.keys(fullCatalogMap).forEach((k) => candidateIds.add(k));
+    }
+
+    // 3. Filter out items currently in cart & out-of-stock items, return up to 4 items
+    return Array.from(candidateIds)
+      .filter((id) => !cartProductKeys.has(id))
+      .map((id) => fullCatalogMap[id])
+      .filter((prod) => prod && (prod.stockCount === undefined || prod.stockCount > 0))
+      .slice(0, 4);
+  }, [cart, fullCatalogMap]);
+
   // 💳 CHECKOUT HANDLER
   const handleCheckout = () => {
-    // 🛑 Rule 1: Minimum 3 scrunchies constraint check
     if (totalScrunchiesCount < 3) {
       toast.error(`Orders must have at least 3 scrunchies! Add ${3 - totalScrunchiesCount} more. 🎀`);
       return;
     }
 
-    // 🛑 Rule 2: Pack of 3 exact multiple check
     if (totalScrunchiesCount % 3 !== 0) {
       const neededToAdd = 3 - (totalScrunchiesCount % 3);
       toast.error(`Scrunchies are sold in packs of 3! Add ${neededToAdd} more to complete your pack. 🎀`);
       return;
     }
 
-    // 🛑 Rule 3: Minimum Amount Boundary Check
     if (subtotal < 499) {
       toast.error("Orders must be at least ₹499 to proceed to checkout!");
       return;
     }
 
-    // 🚀 Audit-Friendly Navigation: Proceed directly to checkout
-    // If not logged in, checkout handles guest credentials seamlessly
     navigate("/checkout");
   };
 
@@ -62,7 +128,6 @@ const Cart = () => {
       className="min-h-screen w-full bg-fixed bg-cover bg-center overflow-x-hidden"
       style={{ backgroundImage: "url('/images/SFBestsellers.png')" }}
     >
-
       <main className="pt-24 sm:pt-28 md:pt-32 pb-12 sm:pb-16 px-4 sm:px-6 md:px-8 max-w-5xl mx-auto">
         {/* 🔙 Back to Shop Link */}
         <button 
@@ -73,10 +138,13 @@ const Cart = () => {
           CONTINUE SHOPPING
         </button>
 
+        {/* 🎀 PACK OF 3 PROGRESS TRACKER */}
+        {cart.length > 0 && <FrillProgressTracker />}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 items-start">
           
-          {/* 🛒 ITEM LIST SECTION */}
-          <div className="lg:col-span-2 space-y-4">
+          {/* 🛒 ITEM LIST & SIMILAR PRODUCTS SECTION */}
+          <div className="lg:col-span-2 space-y-6">
             <div className="bg-white/90 backdrop-blur-md p-4 sm:p-6 rounded-2xl sm:rounded-3xl shadow-xl border border-pink-100">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-5 sm:mb-6 pb-3 border-b border-gray-100">
                 <h1 className="text-xl sm:text-2xl font-black text-gray-800 tracking-tight uppercase">
@@ -99,7 +167,7 @@ const Cart = () => {
                 ) : null}
               </div>
 
-              {/* Optional Sign-in Banner for Guest Shoppers */}
+              {/* Guest Sign In Prompt */}
               {!user && (
                 <div className="mb-4 p-3 bg-pink-50/80 border border-pink-200 rounded-xl flex items-center justify-between">
                   <span className="text-xs font-bold text-gray-700">
@@ -139,18 +207,25 @@ const Cart = () => {
                             <h3 className="text-xs sm:text-sm font-black text-gray-800 leading-tight uppercase truncate">
                               {item.name}
                             </h3>
-                            <p className="text-[#E02171] font-bold text-xs sm:text-sm mt-0.5">
-                              ₹{item.price}
-                            </p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[#E02171] font-bold text-xs sm:text-sm">
+                                ₹{item.price}
+                              </span>
+                              {item.compareAtPrice && (
+                                <span className="text-[10px] text-gray-400 line-through font-medium">
+                                  ₹{item.compareAtPrice}
+                                </span>
+                              )}
+                            </div>
                             {isMaxStockReached && (
-                              <span className="text-[9px] font-bold text-rose-500">
+                              <span className="text-[9px] font-bold text-rose-500 block mt-0.5">
                                 Max stock reached ({maxStock})
                               </span>
                             )}
                           </div>
                         </div>
 
-                        {/* Dynamic Quantity & Remove Controls */}
+                        {/* Quantity Controls */}
                         <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-50">
                           <div className="flex items-center gap-2 sm:gap-3 bg-gray-50 p-1.5 rounded-lg border border-gray-200">
                             <button 
@@ -213,11 +288,74 @@ const Cart = () => {
                 </div>
               )}
             </div>
+
+            {/* 🛍️ ENTERPRISE "SIMILAR PRODUCTS" / "FREQUENTLY PAIRED" CAROUSEL */}
+            {recommendedProducts.length > 0 && cart.length > 0 && (
+              <div className="bg-white/95 backdrop-blur-md p-4 sm:p-6 rounded-2xl sm:rounded-3xl shadow-xl border border-pink-100 text-left">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="text-xs sm:text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <span>✨</span> Frequently Paired Together
+                    </h2>
+                    <p className="text-[10px] text-gray-400 font-medium">
+                      Curated styles matching your current selection
+                    </p>
+                  </div>
+                  <span className="text-[9px] font-black uppercase text-[#E02171] bg-pink-50 border border-pink-200 px-2.5 py-0.5 rounded-full">
+                    Launch Price ₹249
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                  {recommendedProducts.map((rec) => (
+                    <div 
+                      key={rec.id || rec.sku}
+                      className="flex flex-col bg-gray-50/60 p-2.5 rounded-xl border border-gray-100 hover:shadow-md transition-shadow"
+                    >
+                      <div 
+                        onClick={() => navigate(`/product/${rec.id || rec.sku}`, { state: { product: rec } })}
+                        className="w-full aspect-square bg-white rounded-lg overflow-hidden border border-gray-200 mb-2 cursor-pointer"
+                      >
+                        <img 
+                          src={rec.image || (Array.isArray(rec.images) ? rec.images[0] : rec.images) || "/images/ScrunchiefrillsComingSoon1.png"} 
+                          alt={rec.name}
+                          className="w-full h-full object-cover hover:scale-105 transition-transform" 
+                        />
+                      </div>
+
+                      <h4 className="text-[11px] font-black text-gray-800 uppercase truncate">
+                        {rec.name}
+                      </h4>
+
+                      <div className="flex items-center gap-1 mt-0.5 mb-2">
+                        <span className="text-xs font-black text-[#E02171]">₹{rec.price}</span>
+                        {rec.compareAtPrice && (
+                          <span className="text-[9px] text-gray-400 line-through font-medium">
+                            ₹{rec.compareAtPrice}
+                          </span>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          addToCart(rec);
+                          toast.success(`Added ${rec.name} to cart! 🎀`);
+                        }}
+                        className="mt-auto w-full py-1.5 bg-white border border-gray-900 hover:bg-[#E02171] hover:text-white hover:border-[#E02171] text-gray-900 rounded-lg text-[10px] font-black uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center gap-1 shadow-2xs"
+                      >
+                        <PlusCircle size={12} />
+                        Add
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 💳 SUMMARY WIDGET COLUMN */}
           <div className="lg:col-span-1 space-y-4 sm:space-y-6 static lg:sticky top-28">
-            
             {!isPackOfThreeValid && totalScrunchiesCount > 0 && (
               <div className="bg-pink-50 border-2 border-dashed border-[#E02171] p-3 rounded-2xl text-center">
                 <p className="text-[11px] font-black text-[#E02171] uppercase leading-tight">
@@ -243,7 +381,6 @@ const Cart = () => {
 
       <Footer />
 
-      {/* 🔐 Interactive Sign In Modal */}
       <AuthModal 
         isOpen={showAuthModal} 
         onClose={() => setShowAuthModal(false)} 

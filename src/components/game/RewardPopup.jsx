@@ -20,19 +20,27 @@ const RewardPopup = ({ rewardDetails, onClose }) => {
 
         {/* Voucher Reward Box */}
         <div className="bg-yellow-50/80 border-2 border-dashed border-yellow-400 rounded-2xl p-4 mb-4">
-          <span className="text-xl font-black text-yellow-600 tracking-wide font-mono block">
+          <span className="text-xs font-black uppercase text-[#e02171] block mb-1">
+            {rewardDetails.title || "20% OFF NEXT ORDER"}
+          </span>
+          <span className="text-2xl font-black text-yellow-600 tracking-wider font-mono block">
             {rewardDetails.code}
           </span>
-          <span className="text-xs text-gray-500 font-medium block mt-1">
+          <span className="text-xs text-gray-500 font-medium block mt-1.5">
             {rewardDetails.description}
           </span>
+          {rewardDetails.validity && (
+            <span className="text-[10px] text-gray-400 font-semibold block mt-1">
+              ⏳ {rewardDetails.validity}
+            </span>
+          )}
         </div>
 
         <button
           onClick={onClose}
-          className="w-full py-2 bg-gray-900 hover:bg-black text-white text-sm font-bold rounded-xl transition-all shadow"
+          className="w-full py-3 bg-[#e02171] hover:bg-black text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer"
         >
-          Sweet, thanks!
+          Sweet, saved to My Rewards! 🎀
         </button>
       </div>
     </div>

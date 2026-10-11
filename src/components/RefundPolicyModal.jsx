@@ -71,7 +71,7 @@ const RefundPolicyModal = ({ isOpen, onClose }) => {
                 <Clock size={15} className="text-[#E02171]" /> 1. Order Cancellation Window
               </h3>
               <p className="text-gray-600 pl-5">
-                Customers can request an order cancellation within <strong>2 hours</strong> of placing the order, or prior to package dispatch and courier handover (whichever occurs first). Once an order has been assigned an AWB tracking code and dispatched via Shiprocket, it cannot be recalled or cancelled. To cancel within the eligible window, email <strong>support@scrunchiefrills.com</strong> with your Order ID.
+                Customers can request an order cancellation within <strong>2 hours</strong> of placing the order, or prior to package dispatch and courier handover (whichever occurs first). Once an order has been assigned an AWB tracking code and dispatched via Shiprocket, it cannot be recalled or cancelled. To cancel within the eligible window, email <strong>hello@scrunchiefrills.com</strong> with your Order ID.
               </p>
             </div>
 
@@ -95,7 +95,7 @@ const RefundPolicyModal = ({ isOpen, onClose }) => {
               </p>
               <ul className="list-disc list-inside pl-7 text-gray-600 space-y-1 mt-1">
                 <li>You must notify us within <strong>48 hours</strong> of parcel delivery.</li>
-                <li>Please submit an unedited <strong>unboxing video</strong> clearly showing the outer shipping label and the flaw/discrepancy to <strong>support@scrunchiefrills.com</strong>.</li>
+                <li>Please submit an unedited <strong>unboxing video</strong> clearly showing the outer shipping label and the flaw/discrepancy to <strong>hello@scrunchiefrills.com</strong>.</li>
                 <li>Upon verification, we will issue a replacement or approve a return and refund.</li>
               </ul>
             </div>

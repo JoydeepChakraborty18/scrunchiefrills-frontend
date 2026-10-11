@@ -207,20 +207,20 @@ const GameShell = () => {
 
   // ── 🎁 REWARD DISPATCHER & FIRESTORE INTEGRATION ──
   const handleClaimReward = async () => {
-    const isHighScore = score >= 30;
+    // 20% discount coupon for the Cyclone Arcade
     const rewardPayload = {
       id: `cyclone_${Date.now()}`,
-      code: isHighScore ? "CYCLONE20" : "CYCLONE15",
-      title: isHighScore ? "20% OFF Everything" : "15% OFF Next Order",
-      description: isHighScore 
-        ? "20% OFF your next order + exclusive free scrunchie bundle!"
-        : "15% OFF your next order + free scrapbook sticker bundle!",
+      code: "CYCLONE20",
+      title: "20% OFF Next Order",
+      description: "20% OFF your next order + exclusive free scrunchie bundle!",
       source: "The Cyclone Arcade 🌪️",
       status: "available",
       validity: "Valid for 14 days",
       earnedAt: new Date().toISOString(),
     };
 
+    // Transition gameState away from 'finished' so ResultsModal unmounts before RewardPopup mounts
+    setGameState("idle");
     setUnlockedReward(rewardPayload);
 
     if (currentUser?.uid) {
@@ -240,7 +240,7 @@ const GameShell = () => {
           cycloneScore: score,
         });
 
-        toast.success("Reward saved to My Rewards! 🎀");
+        toast.success("20% OFF Reward saved to My Rewards! 🎀");
       } catch (err) {
         console.error("Failed to sync reward to profile:", err);
         toast.error("Could not sync reward. Please try again.");
