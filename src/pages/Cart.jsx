@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, Minus, Plus, Trash2, PlusCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import Navbar from "../components/Navbar";
 import { useCart } from "../context/CartContext";
 import { usePricing } from "../context/PricingContext";
 import { 
@@ -10,6 +9,8 @@ import {
   CartSummaryDetailsBox as CheckoutSummaryDetailsBox,
   FrillProgressTracker
 } from "../components/PricingWidgets";
+import BundleUnlocksSection from "../components/BundleUnlocksSection";
+import CouponSection from "../components/CouponSection";
 import { auth, db } from "../firebase";
 import { collection, onSnapshot } from "firebase/firestore";
 import Footer from "../sections/Footer";
@@ -22,16 +23,16 @@ import fallbackCatalog from "../data/products.json";
 /**
  * ✨ CART COMPONENT ✨
  * Designed for: Scrunchiefrills™ 
- * Features: Live Firestore Sheet Sync, Pack of 3 Rule, Similar Products Cross-Sell, AuthModal & Guest Access
+ * Features: Live Firestore Sheet Sync, Pack of 3 Rule, Bundle Unlocks, Similar Products Cross-Sell, AuthModal & Guest Access
  */
 const Cart = () => {
   const navigate = useNavigate();
   const { cart, addToCart, removeFromCart, updateQuantity } = useCart();
   const user = auth.currentUser;
-  const { subtotal } = usePricing();
+  const { subtotal, couponSavings, appliedCoupon } = usePricing();
   const [showAuthModal, setShowAuthModal] = useState(false);
 
-  // 🔄 Real-time Firestore Collection State (Full Catalog synced from Google Sheets)
+  // 🔄 Real-time Firestore Collection State
   const [liveProductsMap, setLiveProductsMap] = useState({});
 
   useEffect(() => {
@@ -55,31 +56,26 @@ const Cart = () => {
     return () => unsub();
   }, []);
 
-  // 🧮 Unified Catalog: Firestore Live Data merged with fallback products.json
+  // 🧮 Unified Catalog
   const fullCatalogMap = useMemo(() => {
-    const combined = { ...fallbackCatalog, ...liveProductsMap };
-    return combined;
+    return { ...fallbackCatalog, ...liveProductsMap };
   }, [liveProductsMap]);
 
   const totalScrunchiesCount = cart.reduce((acc, item) => acc + item.quantity, 0);
   const isPackOfThreeValid = totalScrunchiesCount >= 3 && totalScrunchiesCount % 3 === 0;
 
-  // 🛍️ ENTERPRISE SIMILAR PRODUCTS ALGORITHM:
-  // Handles both Array and comma-separated String representations from Google Sheet Column P
+  // 🛍️ ENTERPRISE SIMILAR PRODUCTS ALGORITHM
   const recommendedProducts = useMemo(() => {
     const cartProductKeys = new Set(
       cart.map((item) => String(item.id || item.sku || "").trim())
     );
     const candidateIds = new Set();
 
-    // 1. Collect similar products referenced by active cart items
     cart.forEach((item) => {
       const itemKey = item.id || item.sku;
       const fullItem = fullCatalogMap[itemKey] || item;
 
       let rawSimilar = fullItem.similarProductIds || fullItem.similarProductId || [];
-      
-      // If stored as comma-separated string from Google Sheets (e.g. "SKU-1, SKU-2")
       if (typeof rawSimilar === "string") {
         rawSimilar = rawSimilar.split(",").map((s) => s.trim()).filter(Boolean);
       }
@@ -89,12 +85,10 @@ const Cart = () => {
       }
     });
 
-    // 2. Fallback: If cart is empty of relations, suggest other products in catalog
     if (candidateIds.size === 0) {
       Object.keys(fullCatalogMap).forEach((k) => candidateIds.add(k));
     }
 
-    // 3. Filter out items currently in cart & out-of-stock items, return up to 4 items
     return Array.from(candidateIds)
       .filter((id) => !cartProductKeys.has(id))
       .map((id) => fullCatalogMap[id])
@@ -288,6 +282,12 @@ const Cart = () => {
                 </div>
               )}
             </div>
+
+            {/* 🎟️ CYCLONE REWARD COUPONS SECTION */}
+            {cart.length > 0 && <CouponSection />}
+
+            {/* 💖 BUNDLE UNLOCKS SECTION */}
+            {cart.length > 0 && <BundleUnlocksSection />}
 
             {/* 🛍️ ENTERPRISE "SIMILAR PRODUCTS" / "FREQUENTLY PAIRED" CAROUSEL */}
             {recommendedProducts.length > 0 && cart.length > 0 && (

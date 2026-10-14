@@ -40,7 +40,18 @@ const Checkout = () => {
   const navigate = useNavigate();
   const { cart, clearCart } = useCart();
   const user = auth.currentUser;
-  const { subtotal } = usePricing();
+
+  // 🎀 Pull synchronized metrics, bundle, and coupon state from PricingContext
+  const { 
+    subtotal, 
+    totalMrp: contextTotalMrp, 
+    launchSavings: contextLaunchSavings, 
+    bundleSavings,
+    couponSavings,
+    appliedCoupon,
+    totalSavings, 
+    selectedBundle 
+  } = usePricing();
 
   // 🛡️ Prevent duplicate payment initialization while a request is already running.
   const paymentInitiationRef = useRef(false);
@@ -319,18 +330,26 @@ const Checkout = () => {
       : 0;
   }, [activeShippingOption]);
 
-  // 🧮 Explicit Total MRP Calculation
+  // Fallback safe calculations if context values are still initializing
   const totalMrp = useMemo(() => {
+    if (contextTotalMrp !== undefined) return contextTotalMrp;
     return cart.reduce((acc, item) => {
       const comparePrice = item.compareAtPrice ? Number(item.compareAtPrice) : 315;
       return acc + comparePrice * (item.quantity || 1);
     }, 0);
-  }, [cart]);
+  }, [cart, contextTotalMrp]);
 
-  // 🧮 Launch MRP Savings: Total MRP - Selling Price Subtotal
   const launchSavings = useMemo(() => {
-    return Math.max(0, totalMrp - Number(subtotal || 0));
-  }, [totalMrp, subtotal]);
+    if (contextLaunchSavings !== undefined) return contextLaunchSavings;
+    const launchPriceSubtotal = cart.reduce((acc, item) => {
+      const price = item.price ? Number(item.price) : 249;
+      return acc + price * (item.quantity || 1);
+    }, 0);
+    return Math.max(0, totalMrp - launchPriceSubtotal);
+  }, [cart, totalMrp, contextLaunchSavings]);
+
+  const currentBundleSavings = bundleSavings || 0;
+  const currentCouponSavings = couponSavings || 0;
 
   const finalPayableTotal = Math.max(
     0,
@@ -338,7 +357,7 @@ const Checkout = () => {
   );
 
   // -------------------------------------------------------------
-  // 4. LIVE SHIPROCKET SHIPPING RATE LOOKUP (WITH AUDIT FALLBACK)
+  // 4. LIVE SHIPROCKET SHIPPING RATE LOOKUP
   // -------------------------------------------------------------
   useEffect(() => {
     const cleanPin = formData.pinCode.replace(/\D/g, "");
@@ -700,8 +719,10 @@ const Checkout = () => {
 
                   pricing: {
                     subtotal,
-                    discountCode: null,
-                    discountAmount: launchSavings,
+                    discountCode: selectedBundle ? selectedBundle.name : (appliedCoupon ? appliedCoupon.code : null),
+                    discountAmount: (launchSavings || 0) + currentBundleSavings + currentCouponSavings,
+                    bundleDiscount: currentBundleSavings,
+                    couponDiscount: currentCouponSavings,
                     shippingCharge: dynamicShippingCharge,
                     finalOrderValue: finalPayableTotal
                   }
@@ -811,7 +832,10 @@ const Checkout = () => {
               items: [...cart],
 
               subtotal,
-              discountAmount: launchSavings,
+              discountCode: selectedBundle ? selectedBundle.name : (appliedCoupon ? appliedCoupon.code : null),
+              discountAmount: (launchSavings || 0) + currentBundleSavings + currentCouponSavings,
+              bundleSavings: currentBundleSavings,
+              couponSavings: currentCouponSavings,
               shippingCharge: dynamicShippingCharge,
               finalOrderValue: finalPayableTotal,
 
@@ -1754,7 +1778,7 @@ const Checkout = () => {
                 <span className="line-through">₹{totalMrp}</span>
               </div>
 
-              {/* Row 2: Discount with See Details Trigger */}
+              {/* Row 2: Launch Discount */}
               {launchSavings > 0 && (
                 <div className="flex justify-between text-[#E02171]">
                   <div className="flex items-center gap-1.5">
@@ -1772,13 +1796,29 @@ const Checkout = () => {
                 </div>
               )}
 
-              {/* Row 3: Subtotal / Base Price */}
+              {/* Row 3: Optional Bundle Savings (Only when a bundle is selected) */}
+              {currentBundleSavings > 0 && (
+                <div className="flex justify-between text-emerald-600 bg-emerald-50 px-2.5 py-1.5 rounded-xl border border-emerald-200">
+                  <span className="font-black">{selectedBundle?.name || "BUNDLE"} SAVINGS ✨</span>
+                  <span className="font-black">- ₹{currentBundleSavings}</span>
+                </div>
+              )}
+
+              {/* Row 3A: Optional Cyclone Coupon Savings (Only when coupon is selected) */}
+              {currentCouponSavings > 0 && (
+                <div className="flex justify-between text-emerald-600 bg-emerald-50 px-2.5 py-1.5 rounded-xl border border-emerald-200">
+                  <span className="font-black">{appliedCoupon?.code} ({appliedCoupon?.discountPercent || 20}% OFF) ✨</span>
+                  <span className="font-black">- ₹{currentCouponSavings}</span>
+                </div>
+              )}
+
+              {/* Row 4: Subtotal / Base Price */}
               <div className="flex justify-between text-gray-700 font-bold border-t border-dashed border-gray-100 pt-2">
                 <span>Subtotal</span>
                 <span>₹{subtotal}</span>
               </div>
 
-              {/* Row 4: Shipping Charge */}
+              {/* Row 5: Shipping Charge */}
               <div className="flex justify-between text-gray-600">
                 <span>Shipping Charge</span>
                 <span className="text-gray-900">
@@ -1796,7 +1836,7 @@ const Checkout = () => {
                 </span>
               </div>
 
-              {/* Row 5: Total Amount */}
+              {/* Row 6: Total Amount */}
               <div className="border-t-2 border-black pt-3 flex justify-between items-baseline text-gray-900">
                 <span className="text-sm font-black uppercase">
                   Total Amount
@@ -1806,10 +1846,10 @@ const Checkout = () => {
                 </span>
               </div>
 
-              {launchSavings > 0 && (
+              {(launchSavings > 0 || currentBundleSavings > 0 || currentCouponSavings > 0) && (
                 <div className="mt-3 bg-pink-50 border border-pink-200 text-[#E02171] font-black text-xs py-2 rounded-xl text-center flex items-center justify-center gap-1.5 shadow-xs">
                   <span>💖</span>
-                  You saved ₹{launchSavings}!
+                  You saved ₹{(launchSavings || 0) + currentBundleSavings + currentCouponSavings}!
                   <span>🎉</span>
                 </div>
               )}
@@ -1927,6 +1967,18 @@ const Checkout = () => {
                   <span>Total Promotional Discount:</span>
                   <span>- ₹{launchSavings}</span>
                 </div>
+                {currentBundleSavings > 0 && (
+                  <div className="flex justify-between text-emerald-600">
+                    <span>Optional Bundle Savings:</span>
+                    <span>- ₹{currentBundleSavings}</span>
+                  </div>
+                )}
+                {currentCouponSavings > 0 && (
+                  <div className="flex justify-between text-emerald-600">
+                    <span>Coupon ({appliedCoupon?.code}) Savings:</span>
+                    <span>- ₹{currentCouponSavings}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-gray-800">
                   <span>Subtotal (Payable items):</span>
                   <span>₹{subtotal}</span>

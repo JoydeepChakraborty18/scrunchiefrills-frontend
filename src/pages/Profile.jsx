@@ -33,6 +33,7 @@ import PreferencesModal from "../components/profile/PreferencesModal";
 import NotificationSettingsModal from "../components/profile/NotificationSettingsModal";
 import AccountPrivacyModal from "../components/profile/AccountPrivacyModal";
 import ProfileAvatarPickerModal from "../components/profile/ProfileAvatarPickerModal";
+import { AVATAR_REGISTRY } from "../data/avatarRegistry";
 
 // 🧮 Central Progression Engine
 import {
@@ -44,53 +45,6 @@ import {
 
 // 🫧 Single Source of Truth for Bubble Cards
 import { bubbleCards } from "../data/bubbleCards";
-
-export const AVATAR_REGISTRY = [
-  {
-    avatarId: "miss-scrunchie",
-    name: "Miss Scrunchie",
-    image: "/images/ProfilePics/MissScrunchie.png",
-    tagline: "The Royal Mascot 👑",
-    unlocked: true,
-    unlockRequirement: null,
-  },
-  {
-    avatarId: "bubblegum-girl",
-    name: "Bubblegum Girl",
-    image: "/images/ProfilePics/BubblegumGirl.png",
-    tagline: "Sweet, bubbly & iconic 💖",
-    unlocked: true,
-    unlockRequirement: null,
-  },
-  {
-    avatarId: "cute-girl",
-    name: "Cute Girl",
-    image: "/images/ProfilePics/CuteGirl.png",
-    tagline: "Pigtails & pure sparkle ✨",
-    unlocked: true,
-    unlockRequirement: null,
-  },
-  {
-    avatarId: "strawberry-matcha-girl",
-    name: "Strawberry Matcha Girl",
-    image: "/images/ProfilePics/StrawberryMatchaGirl.png",
-    tagline: "Iced sips & effortless shade 🍵",
-    unlocked: false,
-    unlockRequirement: "Collect 10 Bubble Cards",
-    reqKey: "bubbleCardsCollected",
-    reqThreshold: 10,
-  },
-  {
-    avatarId: "bawse-girl",
-    name: "Bawse Girl",
-    image: "/images/ProfilePics/BawseGirl.png",
-    tagline: "Handling business in pink 💼",
-    unlocked: false,
-    unlockRequirement: "Place 5 orders",
-    reqKey: "ordersCount",
-    reqThreshold: 5,
-  },
-];
 
 const CONFIRMED_STATUSES = ["CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED", "COMPLETED"];
 
@@ -433,304 +387,316 @@ const Profile = () => {
 
   return (
     <div className="min-h-screen w-full bg-[#FFF2F8] text-gray-800 font-sans pt-24 sm:pt-28 pb-28 selection:bg-pink-200">
-      <main className="max-w-lg mx-auto px-4 space-y-4">
-        {/* 1. PROFILE HEADER CARD (Matches Screenshot 2 Two-Column Layout) */}
-        <div className="bg-white rounded-[32px] p-5 sm:p-6 border border-pink-100/80 shadow-sm relative overflow-hidden">
-          <span className="absolute top-3 right-4 text-2xl select-none filter drop-shadow-xs">🎀</span>
+      {/* 🖥️ Wide Full-Canvas Responsive Container */}
+      <main className="w-full max-w-[1550px] mx-auto px-4 sm:px-6 md:px-10 xl:px-14">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 xl:gap-10 items-start">
+          
+          {/* 🌟 LEFT COLUMN: Profile Identity & Gamification Stack (5 Cols on Large, 4 on XL) */}
+          <div className="lg:col-span-5 xl:col-span-5 space-y-5 lg:sticky lg:top-28">
+            
+            {/* 1. PROFILE HEADER CARD */}
+            <div className="bg-white rounded-[32px] p-6 sm:p-7 border border-pink-100 shadow-sm relative overflow-hidden">
+              <span className="absolute top-4 right-5 text-2xl select-none filter drop-shadow-xs">🎀</span>
 
-          <div className="flex items-center gap-4 sm:gap-5">
-            {/* Left: Avatar with Edit Badge */}
-            <div className="relative shrink-0">
-              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-gradient-to-b from-[#FFF2F8] to-pink-50 border-4 border-white shadow-md flex items-center justify-center overflow-hidden">
-                <img
-                  src={avatarImageSrc}
-                  alt={displayName}
-                  className="w-full h-full object-cover object-center rounded-full"
-                />
+              <div className="flex items-center gap-5 sm:gap-6">
+                {/* Left: Avatar with Edit Badge */}
+                <div className="relative shrink-0">
+                  <div className="w-24 h-24 sm:w-28 sm:h-28 xl:w-32 xl:h-32 rounded-full bg-gradient-to-b from-[#FFF2F8] to-pink-50 border-4 border-white shadow-md flex items-center justify-center overflow-hidden">
+                    <img
+                      src={avatarImageSrc}
+                      alt={displayName}
+                      className="w-full h-full object-cover object-center rounded-full"
+                    />
+                  </div>
+                  <button
+                    onClick={() => setIsAvatarPickerOpen(true)}
+                    className="absolute bottom-1 right-1 w-8 h-8 xl:w-9 xl:h-9 rounded-full bg-[#E02171] text-white flex items-center justify-center shadow-md border-2 border-white hover:scale-110 active:scale-95 transition cursor-pointer"
+                    title="Change Avatar"
+                  >
+                    <Edit2 size={13} />
+                  </button>
+                </div>
+
+                {/* Right: User Information */}
+                <div className="flex-1 min-w-0 space-y-1.5 text-left">
+                  <h2 className="text-lg sm:text-xl xl:text-2xl font-black text-gray-900 tracking-tight leading-snug break-words">
+                    {displayName}
+                  </h2>
+                  <p className="text-xs sm:text-sm font-bold text-gray-400">@{username}</p>
+
+                  <div className="pt-0.5">
+                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#E02171] text-[10px] font-black text-white uppercase tracking-wider shadow-2xs">
+                      ✓ VERIFIED SCRUNCHIEFRILLER
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-gray-400 font-semibold flex items-center gap-1 pt-0.5">
+                    📅 Scrunchiefriller since Sept 2026
+                  </p>
+
+                  <div className="pt-2">
+                    <button
+                      onClick={() => setIsAccountPrivacyOpen(true)}
+                      className="px-4 py-1.5 rounded-full bg-white border border-pink-200 text-xs font-black text-gray-700 hover:text-[#E02171] hover:border-[#E02171] transition shadow-2xs cursor-pointer flex items-center gap-1.5 active:scale-98"
+                    >
+                      <Edit2 size={12} className="text-[#E02171]" /> Edit Profile
+                    </button>
+                  </div>
+                </div>
               </div>
+            </div>
+
+            {/* 2. MY FRILL PERSONA COMPONENT */}
+            {persona ? (
+              <PersonaCard
+                personaName={persona.name}
+                onRetakeQuiz={() => {
+                  localStorage.removeItem("sf_quiz_result_key");
+                  navigate("/home#quiz", { state: { scrollToQuiz: true } });
+                }}
+              />
+            ) : (
+              <div className="bg-white rounded-[32px] p-6 border-2 border-dashed border-pink-200 text-center space-y-3 shadow-xs">
+                <span className="text-3xl">✨</span>
+                <h3 className="text-sm font-black text-gray-900 uppercase tracking-tight">Discover Your Frill Persona</h3>
+                <p className="text-xs text-gray-400 max-w-xs mx-auto">
+                  Take our quick 4-question aesthetic quiz to discover your vibe, earn +150 XP, and unlock perks!
+                </p>
+                <button
+                  onClick={() => {
+                    localStorage.removeItem("sf_quiz_result_key");
+                    navigate("/home#quiz", { state: { scrollToQuiz: true } });
+                  }}
+                  className="px-6 py-2.5 bg-[#E02171] text-white rounded-full text-xs font-black uppercase tracking-wider shadow-md hover:bg-pink-600 transition cursor-pointer"
+                >
+                  Take the Quiz 🎀
+                </button>
+              </div>
+            )}
+
+            {/* 3. GAMIFIED STATS COMPONENT */}
+            <FrillStatsGrid
+              stats={userStats}
+              onViewAllClick={() => setIsStatsModalOpen(true)}
+            />
+          </div>
+
+          {/* 📂 RIGHT COLUMN: Interactive Accordions & Buyer Protection (7 Cols on Large, 8 on XL) */}
+          <div className="lg:col-span-7 xl:col-span-7 space-y-5">
+            {/* 4. NAVIGATION ACCORDION TILES */}
+            <div className="bg-white rounded-[32px] border border-pink-100 shadow-sm divide-y divide-pink-50 overflow-hidden">
+              {/* MY AVATARS */}
               <button
-                onClick={() => setIsAvatarPickerOpen(true)}
-                className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-[#E02171] text-white flex items-center justify-center shadow-md border-2 border-white hover:scale-110 active:scale-95 transition cursor-pointer"
-                title="Change Avatar"
+                onClick={() => toggleSection("avatars")}
+                className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-[#FFF9FB] transition text-left cursor-pointer"
               >
-                <Edit2 size={12} />
+                <div className="flex items-center gap-3.5">
+                  <span className="text-2xl shrink-0 select-none">🎀</span>
+                  <div>
+                    <span className="text-xs sm:text-sm font-black text-gray-900 block leading-tight">My Avatars</span>
+                    <span className="text-[10px] sm:text-xs text-gray-400 font-medium">Choose, unlock and collect exclusive Scrunchiefrills avatars</span>
+                  </div>
+                </div>
+                <ChevronRight size={16} className={`text-pink-300 transition-transform ${activeSection === "avatars" ? "rotate-90" : ""}`} />
+              </button>
+              {activeSection === "avatars" && (
+                <div className="p-3 sm:p-4 border-t border-pink-100">
+                  <AvatarCollectionSection
+                    currentAvatarId={selectedAvatarId}
+                    userStats={userStats}
+                    onSelectAvatar={handleSelectAvatar}
+                    onOpenPicker={() => setIsAvatarPickerOpen(true)}
+                  />
+                </div>
+              )}
+
+              {/* MY ORDERS */}
+              <button
+                onClick={() => toggleSection("orders")}
+                className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-[#FFF9FB] transition text-left cursor-pointer"
+              >
+                <div className="flex items-center gap-3.5">
+                  <span className="text-2xl shrink-0 select-none">🛍️</span>
+                  <div>
+                    <span className="text-xs sm:text-sm font-black text-gray-900 block leading-tight">My Orders</span>
+                    <span className="text-[10px] sm:text-xs text-gray-400 font-medium">Track, view or reorder your purchases</span>
+                  </div>
+                </div>
+                <ChevronRight size={16} className={`text-pink-300 transition-transform ${activeSection === "orders" ? "rotate-90" : ""}`} />
+              </button>
+              {activeSection === "orders" && (
+                <div className="p-4 sm:p-5 bg-[#FFFDFE] border-t border-pink-100 space-y-3">
+                  {confirmedOrders.length === 0 ? (
+                    <div className="p-8 text-center space-y-3">
+                      <div className="text-3xl">🛍️</div>
+                      <h4 className="text-xs font-black text-gray-900 uppercase">No confirmed orders placed yet!</h4>
+                      <p className="text-xs text-gray-400">Your scrunchie stack is waiting to be filled.</p>
+                      <button
+                        onClick={() => navigate("/shop")}
+                        className="px-5 py-2.5 bg-[#E02171] text-white rounded-full text-xs font-black uppercase tracking-wider cursor-pointer"
+                      >
+                        Start Shopping
+                      </button>
+                    </div>
+                  ) : (
+                    confirmedOrders.map((order) => (
+                      <OrderHistoryCard
+                        key={order.id || order.orderId}
+                        order={order}
+                        onTrackClick={handleTrackModal}
+                      />
+                    ))
+                  )}
+                </div>
+              )}
+
+              {/* MY SCRAPBOOK */}
+              <button
+                onClick={() => toggleSection("scrapbook")}
+                className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-[#FFF9FB] transition text-left cursor-pointer"
+              >
+                <div className="flex items-center gap-3.5">
+                  <span className="text-2xl shrink-0 select-none">🫧</span>
+                  <div>
+                    <span className="text-xs sm:text-sm font-black text-gray-900 block leading-tight">My Scrapbook</span>
+                    <span className="text-[10px] sm:text-xs text-gray-400 font-medium">Your collected Bubble Cards, quiz results and more</span>
+                  </div>
+                </div>
+                <ChevronRight size={16} className={`text-pink-300 transition-transform ${activeSection === "scrapbook" ? "rotate-90" : ""}`} />
+              </button>
+              {activeSection === "scrapbook" && (
+                <div className="p-3 sm:p-4 border-t border-pink-100">
+                  <ScrapbookGridSection bubbleCardsMap={bubbleCardsMap} />
+                </div>
+              )}
+
+              {/* MY REWARDS */}
+              <button
+                onClick={() => toggleSection("rewards")}
+                className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-[#FFF9FB] transition text-left cursor-pointer"
+              >
+                <div className="flex items-center gap-3.5">
+                  <span className="text-2xl shrink-0 select-none">🎁</span>
+                  <div>
+                    <span className="text-xs sm:text-sm font-black text-gray-900 block leading-tight">My Rewards</span>
+                    <span className="text-[10px] sm:text-xs text-gray-400 font-medium">Coupons, freebies and exclusive rewards</span>
+                  </div>
+                </div>
+                <ChevronRight size={16} className={`text-pink-300 transition-transform ${activeSection === "rewards" ? "rotate-90" : ""}`} />
+              </button>
+              {activeSection === "rewards" && (
+                <div className="p-3 sm:p-4 border-t border-pink-100">
+                  <RewardsSection rewards={authenticRewards} />
+                </div>
+              )}
+
+              {/* MY FRILL PREFERENCES */}
+              <button
+                onClick={() => setIsPreferencesOpen(true)}
+                className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-[#FFF9FB] transition text-left cursor-pointer"
+              >
+                <div className="flex items-center gap-3.5">
+                  <span className="text-2xl shrink-0 select-none">💗</span>
+                  <div>
+                    <span className="text-xs sm:text-sm font-black text-gray-900 block leading-tight">My Frill Preferences</span>
+                    <span className="text-[10px] sm:text-xs text-gray-400 font-medium">Colours, vibes and products you love</span>
+                  </div>
+                </div>
+                <ChevronRight size={16} className="text-pink-300" />
+              </button>
+
+              {/* SAVED ADDRESSES */}
+              <button
+                onClick={() => toggleSection("addresses")}
+                className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-[#FFF9FB] transition text-left cursor-pointer"
+              >
+                <div className="flex items-center gap-3.5">
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="w-6 h-6 filter drop-shadow-[0_2px_4px_rgba(224,33,113,0.3)] shrink-0"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M12 2C8.13401 2 5 5.13401 5 9C5 14.25 12 22 12 22C12 22 19 14.25 19 9C19 5.13401 15.866 2 12 2Z"
+                      fill="url(#pinGradientProfilePin)"
+                    />
+                    <circle cx="12" cy="9" r="3" fill="white" />
+                    <defs>
+                      <linearGradient id="pinGradientProfilePin" x1="5" y1="2" x2="19" y2="22" gradientUnits="userSpaceOnUse">
+                        <stop stopColor="#FF4B91" />
+                        <stop offset="0.5" stopColor="#E02171" />
+                        <stop offset="1" stopColor="#B31255" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                  <div>
+                    <span className="text-xs sm:text-sm font-black text-gray-900 block leading-tight">Saved Addresses</span>
+                    <span className="text-[10px] sm:text-xs text-gray-400 font-medium">Manage your delivery addresses</span>
+                  </div>
+                </div>
+                <ChevronRight size={16} className={`text-pink-300 transition-transform ${activeSection === "addresses" ? "rotate-90" : ""}`} />
+              </button>
+              {activeSection === "addresses" && (
+                <div className="p-4 sm:p-5 bg-[#FFFDFE] border-t border-pink-100">
+                  <AddressManager
+                    user={currentUser}
+                    profile={profileData}
+                    onProfileUpdate={(updated) => setProfileData(updated)}
+                  />
+                </div>
+              )}
+
+              {/* NOTIFICATIONS */}
+              <button
+                onClick={() => setIsNotificationsOpen(true)}
+                className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-[#FFF9FB] transition text-left cursor-pointer"
+              >
+                <div className="flex items-center gap-3.5">
+                  <span className="text-2xl shrink-0 select-none">🔔</span>
+                  <div>
+                    <span className="text-xs sm:text-sm font-black text-gray-900 block leading-tight">Notifications</span>
+                    <span className="text-[10px] sm:text-xs text-gray-400 font-medium">Order updates, offers, new drops and more</span>
+                  </div>
+                </div>
+                <ChevronRight size={16} className="text-pink-300" />
+              </button>
+
+              {/* ACCOUNT & PRIVACY */}
+              <button
+                onClick={() => setIsAccountPrivacyOpen(true)}
+                className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-[#FFF9FB] transition text-left cursor-pointer"
+              >
+                <div className="flex items-center gap-3.5">
+                  <span className="text-2xl shrink-0 select-none">⚙</span>
+                  <div>
+                    <span className="text-xs sm:text-sm font-black text-gray-900 block leading-tight">Account & Privacy</span>
+                    <span className="text-[10px] sm:text-xs text-gray-400 font-medium">Personal information, security and account settings</span>
+                  </div>
+                </div>
+                <ChevronRight size={16} className="text-gray-400" />
               </button>
             </div>
 
-            {/* Right: User Information */}
-            <div className="flex-1 min-w-0 space-y-1">
-              <h2 className="text-lg sm:text-xl font-black text-gray-900 tracking-tight truncate leading-tight">
-                {displayName}
-              </h2>
-              <p className="text-xs font-bold text-gray-400">@{username}</p>
-
-              <div className="pt-0.5">
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#E02171] text-[9px] font-black text-white uppercase tracking-wider shadow-2xs">
-                  ✓ VERIFIED SCRUNCHIEFRILLER
-                </span>
+            {/* 5. BUYER PROTECTION FOOTER CARD */}
+            <div className="bg-white rounded-[32px] p-5 sm:p-6 border border-pink-100/90 shadow-sm relative overflow-hidden flex items-center justify-between gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-pink-50 border border-pink-100 flex items-center justify-center text-2xl shrink-0">
+                📦
               </div>
-
-              <p className="text-[10px] text-gray-400 font-semibold flex items-center gap-1 pt-0.5">
-                📅 Scrunchiefriller since Sept 2026
-              </p>
-
-              <div className="pt-1.5">
-                <button
-                  onClick={() => setIsAccountPrivacyOpen(true)}
-                  className="px-4 py-1.5 rounded-full bg-white border border-pink-200 text-[11px] font-black text-gray-700 hover:text-[#E02171] hover:border-[#E02171] transition shadow-2xs cursor-pointer flex items-center gap-1.5 active:scale-98"
-                >
-                  <Edit2 size={11} className="text-[#E02171]" /> Edit Profile
-                </button>
+              <div className="flex-1 min-w-0 text-left">
+                <p className="text-xs sm:text-sm font-black text-[#E02171] uppercase tracking-wider">
+                  Scrunchiefrills Buyer Protection
+                </p>
+                <p className="text-[11px] sm:text-xs text-gray-500 mt-0.5 leading-relaxed">
+                  Every parcel is hand-checked, sanitised, and dispatched with tamper-proof packaging.
+                </p>
+              </div>
+              <div className="text-2xl shrink-0 select-none">
+                🎀
               </div>
             </div>
           </div>
-        </div>
 
-        {/* 2. MY FRILL PERSONA COMPONENT */}
-        {persona ? (
-          <PersonaCard
-            personaName={persona.name}
-            onRetakeQuiz={() => {
-              localStorage.removeItem("sf_quiz_result_key");
-              navigate("/home#quiz", { state: { scrollToQuiz: true } });
-            }}
-          />
-        ) : (
-          <div className="bg-white rounded-[32px] p-6 border-2 border-dashed border-pink-200 text-center space-y-3 shadow-xs">
-            <span className="text-3xl">✨</span>
-            <h3 className="text-sm font-black text-gray-900 uppercase tracking-tight">Discover Your Frill Persona</h3>
-            <p className="text-xs text-gray-400 max-w-xs mx-auto">
-              Take our quick 4-question aesthetic quiz to discover your vibe, earn +150 XP, and unlock perks!
-            </p>
-            <button
-              onClick={() => {
-                localStorage.removeItem("sf_quiz_result_key");
-                navigate("/home#quiz", { state: { scrollToQuiz: true } });
-              }}
-              className="px-6 py-2.5 bg-[#E02171] text-white rounded-full text-xs font-black uppercase tracking-wider shadow-md hover:bg-pink-600 transition cursor-pointer"
-            >
-              Take the Quiz 🎀
-            </button>
-          </div>
-        )}
-
-        {/* 3. GAMIFIED STATS COMPONENT */}
-        <FrillStatsGrid
-          stats={userStats}
-          onViewAllClick={() => setIsStatsModalOpen(true)}
-        />
-
-        {/* 4. NAVIGATION ACCORDION TILES (Borderless Icons matching mockup) */}
-        <div className="bg-white rounded-[32px] border border-pink-100 shadow-sm divide-y divide-pink-50 overflow-hidden">
-          {/* MY AVATARS */}
-          <button
-            onClick={() => toggleSection("avatars")}
-            className="w-full flex items-center justify-between p-4 hover:bg-[#FFF9FB] transition text-left cursor-pointer"
-          >
-            <div className="flex items-center gap-3.5">
-              <span className="text-2xl shrink-0 select-none">🎀</span>
-              <div>
-                <span className="text-xs font-black text-gray-900 block leading-tight">My Avatars</span>
-                <span className="text-[10px] text-gray-400 font-medium">Choose, unlock and collect exclusive Scrunchiefrills avatars</span>
-              </div>
-            </div>
-            <ChevronRight size={16} className={`text-pink-300 transition-transform ${activeSection === "avatars" ? "rotate-90" : ""}`} />
-          </button>
-          {activeSection === "avatars" && (
-            <div className="p-2 border-t border-pink-100">
-              <AvatarCollectionSection
-                currentAvatarId={selectedAvatarId}
-                userStats={userStats}
-                onSelectAvatar={handleSelectAvatar}
-                onOpenPicker={() => setIsAvatarPickerOpen(true)}
-              />
-            </div>
-          )}
-
-          {/* MY ORDERS */}
-          <button
-            onClick={() => toggleSection("orders")}
-            className="w-full flex items-center justify-between p-4 hover:bg-[#FFF9FB] transition text-left cursor-pointer"
-          >
-            <div className="flex items-center gap-3.5">
-              <span className="text-2xl shrink-0 select-none">🛍️</span>
-              <div>
-                <span className="text-xs font-black text-gray-900 block leading-tight">My Orders</span>
-                <span className="text-[10px] text-gray-400 font-medium">Track, view or reorder your purchases</span>
-              </div>
-            </div>
-            <ChevronRight size={16} className={`text-pink-300 transition-transform ${activeSection === "orders" ? "rotate-90" : ""}`} />
-          </button>
-          {activeSection === "orders" && (
-            <div className="p-4 bg-[#FFFDFE] border-t border-pink-100 space-y-3">
-              {confirmedOrders.length === 0 ? (
-                <div className="p-8 text-center space-y-3">
-                  <div className="text-3xl">🛍️</div>
-                  <h4 className="text-xs font-black text-gray-900 uppercase">No confirmed orders placed yet!</h4>
-                  <p className="text-xs text-gray-400">Your scrunchie stack is waiting to be filled.</p>
-                  <button
-                    onClick={() => navigate("/shop")}
-                    className="px-5 py-2.5 bg-[#E02171] text-white rounded-full text-xs font-black uppercase tracking-wider cursor-pointer"
-                  >
-                    Start Shopping
-                  </button>
-                </div>
-              ) : (
-                confirmedOrders.map((order) => (
-                  <OrderHistoryCard
-                    key={order.id || order.orderId}
-                    order={order}
-                    onTrackClick={handleTrackModal}
-                  />
-                ))
-              )}
-            </div>
-          )}
-
-          {/* MY SCRAPBOOK */}
-          <button
-            onClick={() => toggleSection("scrapbook")}
-            className="w-full flex items-center justify-between p-4 hover:bg-[#FFF9FB] transition text-left cursor-pointer"
-          >
-            <div className="flex items-center gap-3.5">
-              <span className="text-2xl shrink-0 select-none">🫧</span>
-              <div>
-                <span className="text-xs font-black text-gray-900 block leading-tight">My Scrapbook</span>
-                <span className="text-[10px] text-gray-400 font-medium">Your collected Bubble Cards, quiz results and more</span>
-              </div>
-            </div>
-            <ChevronRight size={16} className={`text-pink-300 transition-transform ${activeSection === "scrapbook" ? "rotate-90" : ""}`} />
-          </button>
-          {activeSection === "scrapbook" && (
-            <div className="p-2 border-t border-pink-100">
-              <ScrapbookGridSection bubbleCardsMap={bubbleCardsMap} />
-            </div>
-          )}
-
-          {/* MY REWARDS */}
-          <button
-            onClick={() => toggleSection("rewards")}
-            className="w-full flex items-center justify-between p-4 hover:bg-[#FFF9FB] transition text-left cursor-pointer"
-          >
-            <div className="flex items-center gap-3.5">
-              <span className="text-2xl shrink-0 select-none">🎁</span>
-              <div>
-                <span className="text-xs font-black text-gray-900 block leading-tight">My Rewards</span>
-                <span className="text-[10px] text-gray-400 font-medium">Coupons, freebies and exclusive rewards</span>
-              </div>
-            </div>
-            <ChevronRight size={16} className={`text-pink-300 transition-transform ${activeSection === "rewards" ? "rotate-90" : ""}`} />
-          </button>
-          {activeSection === "rewards" && (
-            <div className="p-2 border-t border-pink-100">
-              <RewardsSection rewards={authenticRewards} />
-            </div>
-          )}
-
-          {/* MY FRILL PREFERENCES */}
-          <button
-            onClick={() => setIsPreferencesOpen(true)}
-            className="w-full flex items-center justify-between p-4 hover:bg-[#FFF9FB] transition text-left cursor-pointer"
-          >
-            <div className="flex items-center gap-3.5">
-              <span className="text-2xl shrink-0 select-none">💗</span>
-              <div>
-                <span className="text-xs font-black text-gray-900 block leading-tight">My Frill Preferences</span>
-                <span className="text-[10px] text-gray-400 font-medium">Colours, vibes and products you love</span>
-              </div>
-            </div>
-            <ChevronRight size={16} className="text-pink-300" />
-          </button>
-
-          {/* SAVED ADDRESSES (Borderless Floating Teardrop Pin) */}
-          <button
-            onClick={() => toggleSection("addresses")}
-            className="w-full flex items-center justify-between p-4 hover:bg-[#FFF9FB] transition text-left cursor-pointer"
-          >
-            <div className="flex items-center gap-3.5">
-              <svg
-                viewBox="0 0 24 24"
-                className="w-6 h-6 filter drop-shadow-[0_2px_4px_rgba(224,33,113,0.3)] shrink-0"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M12 2C8.13401 2 5 5.13401 5 9C5 14.25 12 22 12 22C12 22 19 14.25 19 9C19 5.13401 15.866 2 12 2Z"
-                  fill="url(#pinGradientProfilePin)"
-                />
-                <circle cx="12" cy="9" r="3" fill="white" />
-                <defs>
-                  <linearGradient id="pinGradientProfilePin" x1="5" y1="2" x2="19" y2="22" gradientUnits="userSpaceOnUse">
-                    <stop stopColor="#FF4B91" />
-                    <stop offset="0.5" stopColor="#E02171" />
-                    <stop offset="1" stopColor="#B31255" />
-                  </linearGradient>
-                </defs>
-              </svg>
-              <div>
-                <span className="text-xs font-black text-gray-900 block leading-tight">Saved Addresses</span>
-                <span className="text-[10px] text-gray-400 font-medium">Manage your delivery addresses</span>
-              </div>
-            </div>
-            <ChevronRight size={16} className={`text-pink-300 transition-transform ${activeSection === "addresses" ? "rotate-90" : ""}`} />
-          </button>
-          {activeSection === "addresses" && (
-            <div className="p-4 bg-[#FFFDFE] border-t border-pink-100">
-              <AddressManager
-                user={currentUser}
-                profile={profileData}
-                onProfileUpdate={(updated) => setProfileData(updated)}
-              />
-            </div>
-          )}
-
-          {/* NOTIFICATIONS */}
-          <button
-            onClick={() => setIsNotificationsOpen(true)}
-            className="w-full flex items-center justify-between p-4 hover:bg-[#FFF9FB] transition text-left cursor-pointer"
-          >
-            <div className="flex items-center gap-3.5">
-              <span className="text-2xl shrink-0 select-none">🔔</span>
-              <div>
-                <span className="text-xs font-black text-gray-900 block leading-tight">Notifications</span>
-                <span className="text-[10px] text-gray-400 font-medium">Order updates, offers, new drops and more</span>
-              </div>
-            </div>
-            <ChevronRight size={16} className="text-pink-300" />
-          </button>
-
-          {/* ACCOUNT & PRIVACY */}
-          <button
-            onClick={() => setIsAccountPrivacyOpen(true)}
-            className="w-full flex items-center justify-between p-4 hover:bg-[#FFF9FB] transition text-left cursor-pointer"
-          >
-            <div className="flex items-center gap-3.5">
-              <span className="text-2xl shrink-0 select-none">⚙️️</span>
-              <div>
-                <span className="text-xs font-black text-gray-900 block leading-tight">Account & Privacy</span>
-                <span className="text-[10px] text-gray-400 font-medium">Personal information, security and account settings</span>
-              </div>
-            </div>
-            <ChevronRight size={16} className="text-gray-400" />
-          </button>
-        </div>
-
-        {/* 5. BUYER PROTECTION FOOTER CARD */}
-        <div className="bg-white rounded-[32px] p-4 sm:p-5 border border-pink-100/90 shadow-sm relative overflow-hidden flex items-center justify-between gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-pink-50 border border-pink-100 flex items-center justify-center text-2xl shrink-0">
-            📦
-          </div>
-          <div className="flex-1 min-w-0 text-center sm:text-left">
-            <p className="text-xs font-black text-[#E02171] uppercase tracking-wider">
-              Scrunchiefrills Buyer Protection
-            </p>
-            <p className="text-[10px] sm:text-[11px] text-gray-500 mt-0.5 leading-relaxed">
-              Every parcel is hand-checked, sanitised, and dispatched with tamper-proof packaging.
-            </p>
-          </div>
-          <div className="text-2xl shrink-0 select-none">
-            🎀
-          </div>
         </div>
       </main>
 

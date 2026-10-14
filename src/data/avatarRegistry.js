@@ -1,5 +1,6 @@
 // src/data/avatarRegistry.js
 export const AVATAR_REGISTRY = [
+  // --- Original Unlocked Mascots ---
   {
     avatarId: "miss-scrunchie",
     name: "Miss Scrunchie",
@@ -24,6 +25,58 @@ export const AVATAR_REGISTRY = [
     unlocked: true,
     unlockRequirement: null,
   },
+
+  // --- ✨ New Direct Unlocked Avatars ---
+  {
+    avatarId: "best-friends-forever",
+    name: "BFF",
+    image: "/images/ProfilePics/BestFriendsForever.png",
+    tagline: "Besties sharing the frills 💖",
+    unlocked: true,
+    unlockRequirement: null,
+  },
+  {
+    avatarId: "best-bro",
+    name: "Best Bro",
+    image: "/images/ProfilePics/BestBro.png",
+    tagline: "Always treating his sister 🛍️",
+    unlocked: true,
+    unlockRequirement: null,
+  },
+  {
+    avatarId: "good-friend",
+    name: "Good Friend",
+    image: "/images/ProfilePics/GoodFriend.png",
+    tagline: "Thoughtful gifts & golden vibes ✨",
+    unlocked: true,
+    unlockRequirement: null,
+  },
+  {
+    avatarId: "her-man",
+    name: "Her Man",
+    image: "/images/ProfilePics/HerMan.png",
+    tagline: "Buying her favorite scrunchies 🌸",
+    unlocked: true,
+    unlockRequirement: null,
+  },
+  {
+    avatarId: "girl-mom",
+    name: "Girl Mom",
+    image: "/images/ProfilePics/GirlAndMom.png",
+    tagline: "Twinning frills & endless love 🎀",
+    unlocked: true,
+    unlockRequirement: null,
+  },
+  {
+    avatarId: "girl-dad",
+    name: "Girl Dad",
+    image: "/images/ProfilePics/GirlAndDad.png",
+    tagline: "Wrapped around her little finger 💖",
+    unlocked: true,
+    unlockRequirement: null,
+  },
+
+  // --- Progression Milestone Locked Avatars ---
   {
     avatarId: "strawberry-matcha-girl",
     name: "Strawberry Matcha Girl",

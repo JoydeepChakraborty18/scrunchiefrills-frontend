@@ -3,11 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { usePricing } from '../context/PricingContext';
 import { useCart } from '../context/CartContext';
 import { CONFIG } from '../utils/pricingEngine';
-import { X, Info } from 'lucide-react';
+import { X, Info, Sparkles } from 'lucide-react';
 
 /**
  * 👑 HUD MODULE Component 1: Pack-of-3 Milestone & Progression Tracker
- * (Guides users strictly to fulfill the Pack-of-3 constraint; shipping is calculated at checkout)
  */
 export const FrillProgressTracker = () => {
   const { totalScrunchies } = usePricing();
@@ -41,16 +40,12 @@ export const FrillProgressTracker = () => {
 
 /**
  * 💖 HUD MODULE Component 2: The Savings Vault
- * (Focuses strictly on MRP Launch Offer Savings; shipping omitted on Cart)
+ * (Displays Total MRP, Launch Offer Savings, and Extra Bundle Savings)
  */
 export const SavingsVaultPanel = () => {
-  const { cart } = useCart();
-  const { subtotal } = usePricing();
+  const { totalMrp, launchSavings, bundleSavings, couponSavings, appliedCoupon, totalSavings } = usePricing();
 
-  const totalMrp = cart.reduce((acc, item) => acc + (Number(item.compareAtPrice) || 315) * item.quantity, 0);
-  const launchSavings = Math.max(0, totalMrp - subtotal);
-
-  if (launchSavings <= 0) return null;
+  if (totalSavings <= 0) return null;
 
   return (
     <div className="border-4 border-black bg-gradient-to-b from-[#fff2f8] to-white p-4 sm:p-5 rounded-2xl sm:rounded-[28px] shadow-[4px_4px_0px_#000] sm:shadow-[6px_6px_0px_#000] uppercase text-left relative overflow-hidden">
@@ -69,11 +64,25 @@ export const SavingsVaultPanel = () => {
           <span>LAUNCH MRP SAVINGS</span>
           <span>- ₹{launchSavings}</span>
         </div>
+
+        {bundleSavings > 0 && (
+          <div className="flex justify-between items-center text-emerald-600 font-black animate-pulse">
+            <span className="flex items-center gap-1">EXTRA BUNDLE SAVINGS ✨</span>
+            <span>- ₹{bundleSavings}</span>
+          </div>
+        )}
+
+        {couponSavings > 0 && (
+          <div className="flex justify-between items-center text-emerald-600 font-black animate-pulse">
+            <span className="flex items-center gap-1">{appliedCoupon?.code || "COUPON"} SAVINGS ✨</span>
+            <span>- ₹{couponSavings}</span>
+          </div>
+        )}
         
         <div className="flex justify-between items-center pt-2 border-t-2 border-black border-dashed text-black font-black text-xs sm:text-sm">
           <span className="tracking-widest text-[#f02d8d]">TOTAL SAVED</span>
           <span className="text-lg sm:text-xl font-black bg-pink-100 border-2 border-black px-2 sm:px-2.5 py-0.5 rounded-xl text-[#f02d8d] shadow-[2px_2px_0px_#000]">
-            ₹{launchSavings}
+            ₹{totalSavings}
           </span>
         </div>
       </div>
@@ -81,10 +90,6 @@ export const SavingsVaultPanel = () => {
   );
 };
 
-/**
- * 🚚 HUD MODULE Component 3: Free Shipping Matrix Widget
- * (Omitted on Cart per shipping privacy policy)
- */
 export const ShippingProgressWidget = () => null;
 
 /**
@@ -92,19 +97,23 @@ export const ShippingProgressWidget = () => null;
  */
 export const CartSummaryDetailsBox = ({ onCheckoutTrigger }) => {
   const { cart } = useCart();
-  const { subtotal, totalScrunchies } = usePricing();
+  const { 
+    subtotal, 
+    totalScrunchies, 
+    totalMrp, 
+    launchSavings, 
+    bundleSavings,
+    couponSavings,
+    appliedCoupon, 
+    selectedBundle 
+  } = usePricing();
   const [showDetailsModal, setShowDetailsModal] = useState(false);
 
-  // Compute Total MRP mathematically: Total MRP - Discount = Subtotal
-  const totalMrp = cart.reduce((acc, item) => acc + (Number(item.compareAtPrice) || 315) * item.quantity, 0);
-  const launchSavings = Math.max(0, totalMrp - subtotal);
-
-  // 🔒 Strict Pack-of-3 (3, 6, 9, 12, 15, 18+ with no upper cap) and ₹499 floor check
   const isPackOfThree = totalScrunchies >= 3 && totalScrunchies % 3 === 0;
   const isCheckoutDisabled = 
     totalScrunchies < 3 || 
     !isPackOfThree || 
-    subtotal < (CONFIG.MIN_ORDER_VALUE || 499);
+    subtotal < (CONFIG?.MIN_ORDER_VALUE || 499);
 
   return (
     <>
@@ -138,9 +147,23 @@ export const CartSummaryDetailsBox = ({ onCheckoutTrigger }) => {
             </div>
           )}
 
-          {/* 🚚 DELIVERY COURIER row omitted from Cart */}
+          {/* Row 3: Optional Bundle Savings (Only when applied) */}
+          {bundleSavings > 0 && (
+            <div className="flex justify-between items-center text-emerald-600 bg-emerald-50 px-2.5 py-1.5 rounded-xl border border-emerald-200">
+              <span className="font-black">{selectedBundle?.name || "BUNDLE"} SAVINGS ✨</span>
+              <span className="font-black">- ₹{bundleSavings}</span>
+            </div>
+          )}
 
-          {/* Row 3: Final Payable Subtotal */}
+          {/* Row 3A: Optional Cyclone Coupon Savings (Only when applied) */}
+          {couponSavings > 0 && (
+            <div className="flex justify-between items-center text-emerald-600 bg-emerald-50 px-2.5 py-1.5 rounded-xl border border-emerald-200">
+              <span className="font-black">{appliedCoupon?.code} ({appliedCoupon?.discountPercent || (appliedCoupon?.code === "CYCLONE10" ? 10 : 20)}% OFF) ✨</span>
+              <span className="font-black">- ₹{couponSavings}</span>
+            </div>
+          )}
+
+          {/* Row 4: Final Payable Subtotal */}
           <div className="flex justify-between items-center pt-3 border-t-4 border-black text-black font-black text-sm">
             <div className="flex flex-col">
               <span className="tracking-widest font-black">SUBTOTAL</span>
@@ -157,7 +180,7 @@ export const CartSummaryDetailsBox = ({ onCheckoutTrigger }) => {
           ⚠️ Hygiene Notice Policy: Non-returnable & No COD. Every package is strictly quality-verified before shipping.
         </div>
 
-        {/* 🛑 Real-time Guidance / Restriction Alerts (No Upper Limit) */}
+        {/* 🛑 Real-time Guidance / Restriction Alerts */}
         {totalScrunchies < 3 && totalScrunchies > 0 && (
           <p className="text-[10px] text-rose-500 font-black tracking-widest text-center animate-pulse">
             🚨 MUST ORDER AT LEAST 3 SCRUNCHIES. ADD {3 - totalScrunchies} MORE TO CHECKOUT.
@@ -170,9 +193,9 @@ export const CartSummaryDetailsBox = ({ onCheckoutTrigger }) => {
           </p>
         )}
 
-        {subtotal < (CONFIG.MIN_ORDER_VALUE || 499) && isPackOfThree && (
+        {subtotal < (CONFIG?.MIN_ORDER_VALUE || 499) && isPackOfThree && (
           <p className="text-[10px] text-rose-500 font-black tracking-widest text-center animate-pulse">
-            🚨 MIN SUBTOTAL IS ₹{CONFIG.MIN_ORDER_VALUE || 499}. NEED: ₹{(CONFIG.MIN_ORDER_VALUE || 499) - subtotal} MORE.
+            🚨 MIN SUBTOTAL IS ₹{CONFIG?.MIN_ORDER_VALUE || 499}. NEED: ₹{(CONFIG?.MIN_ORDER_VALUE || 499) - subtotal} MORE.
           </p>
         )}
 
@@ -190,8 +213,8 @@ export const CartSummaryDetailsBox = ({ onCheckoutTrigger }) => {
             ? `ADD ${3 - totalScrunchies} MORE SCRUNCHIES`
             : totalScrunchies % 3 !== 0
             ? `ADD ${3 - (totalScrunchies % 3)} MORE FOR PACK`
-            : subtotal < (CONFIG.MIN_ORDER_VALUE || 499)
-            ? `MIN ORDER ₹${CONFIG.MIN_ORDER_VALUE || 499}`
+            : subtotal < (CONFIG?.MIN_ORDER_VALUE || 499)
+            ? `MIN ORDER ₹${CONFIG?.MIN_ORDER_VALUE || 499}`
             : "PROCEED TO CHECKOUT 🚀"}
         </button>
       </div>
@@ -248,6 +271,18 @@ export const CartSummaryDetailsBox = ({ onCheckoutTrigger }) => {
                   <span>Total Promotional Discount:</span>
                   <span>- ₹{launchSavings}</span>
                 </div>
+                {bundleSavings > 0 && (
+                  <div className="flex justify-between text-emerald-600">
+                    <span>Optional Bundle Savings:</span>
+                    <span>- ₹{bundleSavings}</span>
+                  </div>
+                )}
+                {couponSavings > 0 && (
+                  <div className="flex justify-between text-emerald-600">
+                    <span>Coupon ({appliedCoupon?.code}) Savings:</span>
+                    <span>- ₹{couponSavings}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-black text-sm pt-2 border-t-2 border-black">
                   <span>Final Payable Subtotal:</span>
                   <span>₹{subtotal}</span>

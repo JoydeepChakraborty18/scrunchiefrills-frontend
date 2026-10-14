@@ -75,7 +75,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 🛡️️ 1. Cryptographic Signature Verification (Timing-Safe)
+    // 🛡 1. Cryptographic Signature Verification (Timing-Safe)
     const hmac = crypto.createHmac("sha256", secret.trim());
     hmac.update(`${razorpay_order_id}|${razorpay_payment_id}`);
     const generatedSignature = hmac.digest("hex");
@@ -146,6 +146,7 @@ export default async function handler(req, res) {
           subtotal: Number(pricing.subtotal || 0),
           discountAmount: Number(pricing.discountAmount || 0),
           discountCode: pricing.discountCode || null,
+          bundleDiscount: Number(pricing.bundleDiscount || 0),
           shippingCharge: Number(pricing.shippingCharge || 0),
           finalOrderValue: Number(pricing.finalOrderValue || 0),
         },
@@ -158,32 +159,52 @@ export default async function handler(req, res) {
       const orderRef = db.collection("orders").doc(orderDocId);
       batch.set(orderRef, normalizedOrderRecord);
 
-      // 👤 4. Atomic Database Commit: customers/{uid}
+      // 👤 4. Atomic Database Commit & Reward Status Update: customers/{uid}
       const customerUid = customer.uid;
       if (customerUid && !customerUid.startsWith("guest")) {
         const customerRef = db.collection("customers").doc(customerUid);
-        batch.set(
-          customerRef,
-          {
-            uid: customerUid,
-            customerName: customer.name || "Customer",
-            email: customer.email || "",
-            phone: customer.phone || "",
-            shippingAddress: customer.shippingAddress || "",
-            city: customer.city || "",
-            state: customer.state || "",
-            pinCode: customer.pinCode || "",
-            billingAddress: customer.billingAddress || customer.shippingAddress || "",
-            billingCity: customer.billingCity || customer.city || "",
-            billingState: customer.billingState || customer.state || "",
-            billingPinCode: customer.billingPinCode || customer.pinCode || "",
-            totalOrders: FieldValue.increment(1),
-            totalSpent: FieldValue.increment(Number(pricing.finalOrderValue || 0)),
-            lastOrderDate: now,
-            updatedAt: now,
-          },
-          { merge: true }
-        );
+        const customerSnap = await customerRef.get();
+
+        const customerUpdates = {
+          uid: customerUid,
+          customerName: customer.name || "Customer",
+          email: customer.email || "",
+          phone: customer.phone || "",
+          shippingAddress: customer.shippingAddress || "",
+          city: customer.city || "",
+          state: customer.state || "",
+          pinCode: customer.pinCode || "",
+          billingAddress: customer.billingAddress || customer.shippingAddress || "",
+          billingCity: customer.billingCity || customer.city || "",
+          billingState: customer.billingState || customer.state || "",
+          billingPinCode: customer.billingPinCode || customer.pinCode || "",
+          totalOrders: FieldValue.increment(1),
+          totalSpent: FieldValue.increment(Number(pricing.finalOrderValue || 0)),
+          lastOrderDate: now,
+          updatedAt: now,
+        };
+
+        // 🎟️ If a promotional reward code was used, mark it as "used" to prevent reuse
+        if (pricing.discountCode && customerSnap.exists) {
+          const customerData = customerSnap.data();
+          const existingRewards = customerData.rewards || [];
+
+          const updatedRewards = existingRewards.map((rw) => {
+            if (rw.code === pricing.discountCode && rw.status !== "used") {
+              return {
+                ...rw,
+                status: "used",
+                usedAt: new Date().toISOString(),
+                usedOnOrder: orderDocId,
+              };
+            }
+            return rw;
+          });
+
+          customerUpdates.rewards = updatedRewards;
+        }
+
+        batch.set(customerRef, customerUpdates, { merge: true });
       }
 
       // 📦 5. Atomic Stock Decrement: products/{productId}

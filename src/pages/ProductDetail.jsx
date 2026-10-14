@@ -23,6 +23,11 @@ const ProductDetail = () => {
   const { id } = useParams();
   const { cart, addToCart, removeFromCart, updateQuantity } = useCart();
 
+  // 🔝 Always reset window scroll to top when mounting or changing product
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [id]);
+
   // 🔄 Real-time Firestore Document State (Supports Direct URL Refresh)
   const [liveProductDoc, setLiveProductDoc] = useState(null);
 
@@ -110,7 +115,6 @@ const ProductDetail = () => {
 
   return (
     <div className="min-h-screen w-full bg-[#FFF5F7] flex flex-col text-black overflow-x-hidden">
-      <Navbar />
       
       <main className="flex-grow pt-24 sm:pt-28 md:pt-32 pb-16 sm:pb-20 px-4 sm:px-6 md:px-8 max-w-5xl mx-auto w-full">
         {/* Navigation Breadcrumb backlink track */}

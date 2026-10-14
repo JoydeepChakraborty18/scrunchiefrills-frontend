@@ -207,20 +207,62 @@ const GameShell = () => {
 
   // ── 🎁 REWARD DISPATCHER & FIRESTORE INTEGRATION ──
   const handleClaimReward = async () => {
-    // 20% discount coupon for the Cyclone Arcade
-    const rewardPayload = {
-      id: `cyclone_${Date.now()}`,
-      code: "CYCLONE20",
-      title: "20% OFF Next Order",
-      description: "20% OFF your next order + exclusive free scrunchie bundle!",
-      source: "The Cyclone Arcade 🌪️",
-      status: "available",
-      validity: "Valid for 14 days",
-      earnedAt: new Date().toISOString(),
-    };
+    // 🎀 Determine reward tier based on score
+    let rewardPayload = null;
 
-    // Transition gameState away from 'finished' so ResultsModal unmounts before RewardPopup mounts
+    if (score >= 600) {
+      rewardPayload = {
+        id: `cyclone_${Date.now()}`,
+        code: "CYCLONE20",
+        title: "20% OFF Next Order",
+        description: "20% OFF on packs of 9 and up! (Not stackable with bundle tiers)",
+        discountPercent: 20,
+        applicableTiers: [9, 12, 15, 18],
+        source: "The Cyclone Arcade 🌪️",
+        status: "available",
+        validity: "Valid for 14 days",
+        earnedAt: new Date().toISOString(),
+      };
+    } else if (score >= 300) {
+      rewardPayload = {
+        id: `cyclone_${Date.now()}`,
+        code: "CYCLONE10",
+        title: "10% OFF Next Order",
+        description: "10% OFF on packs of 3 & 6! (Not stackable with bundle tiers)",
+        discountPercent: 10,
+        applicableTiers: [3, 6],
+        source: "The Cyclone Arcade 🌪️",
+        status: "available",
+        validity: "Valid for 14 days",
+        earnedAt: new Date().toISOString(),
+      };
+    }
+
+    // Dismiss ResultsModal
     setGameState("idle");
+
+    if (!rewardPayload) {
+      // Score < 300: No reward to save
+      toast("Better luck next time! Pop more bubbles to score 300+ next week! 🌸", {
+        icon: "✨",
+        duration: 4000,
+      });
+      setHasPlayedThisWeek(true);
+      setGameState("cooldown");
+
+      if (currentUser?.uid) {
+        try {
+          const userRef = doc(db, "customers", currentUser.uid);
+          await setDoc(userRef, { lastPlayedCycloneWeek: weekKey }, { merge: true });
+          await syncUserProgression(currentUser.uid, "CYCLONE_GAME_PLAYED", { cycloneScore: score });
+        } catch (e) {
+          console.warn("Could not sync cooldown:", e);
+        }
+      }
+      return;
+    }
+
+    // Mount popup for 300+ scorers
     setUnlockedReward(rewardPayload);
 
     if (currentUser?.uid) {
@@ -235,12 +277,11 @@ const GameShell = () => {
           { merge: true }
         );
 
-        // 🌟 Sync gameplay event & bonus XP with Central Progression Engine
         await syncUserProgression(currentUser.uid, "CYCLONE_GAME_PLAYED", {
           cycloneScore: score,
         });
 
-        toast.success("20% OFF Reward saved to My Rewards! 🎀");
+        toast.success(`${rewardPayload.title} saved to My Rewards! 🎀`);
       } catch (err) {
         console.error("Failed to sync reward to profile:", err);
         toast.error("Could not sync reward. Please try again.");
@@ -385,7 +426,13 @@ const GameShell = () => {
       <ResultsModal 
         visible={gameState === "finished"}
         score={score}
-        scoreTier={score >= 30 ? "Super Premium Elite 👑" : "Cute Collector 🌸"}
+        scoreTier={
+          score >= 600
+            ? "Super Premium Elite 👑 (Cyclone 20 Unlocked!)"
+            : score >= 300
+            ? "Cute Collector 🌸 (Cyclone 10 Unlocked!)"
+            : "Bubble Beginner 🫧 (Better Luck Next Time!)"
+        }
         onClaimReward={handleClaimReward}
       />
 

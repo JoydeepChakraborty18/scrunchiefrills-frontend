@@ -35,7 +35,7 @@ const AvatarCollectionSection = ({
         </button>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-1">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 pt-1">
         {AVATAR_REGISTRY.map((item) => {
           const unlocked = isUnlocked(item);
           const isSelected = currentAvatarId === item.avatarId;

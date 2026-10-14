@@ -21,7 +21,7 @@ import GameShell from "./pages/GameShell"; // 🕹️ Imported Game Shell Module
 import Profile from "./pages/Profile";
 
 import { onAuthStateChanged } from "firebase/auth";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { auth } from "./firebase";
 import { ensureUserDoc } from "./utils/ensureUserDoc";
 
@@ -30,6 +30,11 @@ function Layout() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const location = useLocation(); // ✅ Hook moved to top level to fix "Rules of Hooks" error
+
+  // 🔝 Route change scroll reset: always open pages at the top
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [location.pathname]);
 
   useEffect(() => {
     // 🔄 Listen to Firebase Auth Changes
@@ -60,6 +65,7 @@ function Layout() {
     "/home",
     "/about",
     "/shop",
+    "/product", // ✅ Added "/product" so ProductDetail renders Marquee, ScrollToTopButton & MobileNav
     "/scrapbook",
     "/cart",
     "/checkout",
