@@ -161,11 +161,8 @@ function Layout() {
           {/* 📦 Order Confirmation */}
           <Route
             path="/order-confirmation/:orderId"
-            element={
-              <ProtectedRoute user={user}>
-                <OrderConfirmation />
-              </ProtectedRoute>
-            }
+            
+            element={<OrderConfirmation />}
           />
 
           {/* 🕹️ Weekly Cyclone Game Module Shell Route */}

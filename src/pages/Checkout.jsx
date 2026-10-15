@@ -55,6 +55,8 @@ const Checkout = () => {
 
   // 🛡️ Prevent duplicate payment initialization while a request is already running.
   const paymentInitiationRef = useRef(false);
+  // 🛡️ Guard against race condition: prevent empty cart redirect after successful checkout
+  const isOrderCompletedRef = useRef(false);
 
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
@@ -224,6 +226,9 @@ const Checkout = () => {
   // EMPTY CART GUARD
   // -------------------------------------------------------------
   useEffect(() => {
+    // 🛡️ If order has succeeded and we are navigating to confirmation, do NOT redirect to cart
+    if (isOrderCompletedRef.current) return;
+
     if (!cart || cart.length === 0) {
       navigate("/cart", { replace: true });
     }
@@ -845,6 +850,9 @@ const Checkout = () => {
                   ? "Express Delivery"
                   : "Standard Delivery")
             };
+
+            // 🛡️ Mark order as completed before clearing cart so empty-cart guard does not fire
+            isOrderCompletedRef.current = true;
 
             await clearCart();
 
@@ -1856,52 +1864,18 @@ const Checkout = () => {
             </div>
           </div>
 
-          {/* TRUST STACK */}
-          <div className="bg-white rounded-3xl p-5 border border-pink-100 shadow-sm space-y-3.5 text-left">
+          {/* TRUST STACK WITH BRAND GRAPHIC */}
+          <div className="bg-white rounded-3xl p-5 border border-pink-100 shadow-sm space-y-3 text-left">
             <h4 className="text-xs font-black uppercase tracking-wider text-gray-900 flex items-center gap-1.5">
               <Sparkles size={14} className="text-[#E02171]" /> Why shop with Scrunchiefrills?
             </h4>
 
-            <div className="space-y-3 text-xs">
-              <div className="flex items-start gap-2.5">
-                <span className="text-[#E02171] text-sm">🌸</span>
-                <div>
-                  <p className="font-bold text-gray-900">Original, quirky designs</p>
-                  <p className="text-[10px] text-gray-400">Prints you won't find anywhere</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2.5">
-                <span className="text-[#E02171] text-sm">🔒</span>
-                <div>
-                  <p className="font-bold text-gray-900">Secure payments</p>
-                  <p className="text-[10px] text-gray-400">100% safe with Razorpay</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2.5">
-                <span className="text-[#E02171] text-sm">🚚</span>
-                <div>
-                  <p className="font-bold text-gray-900">Tracked shipping</p>
-                  <p className="text-[10px] text-gray-400">Via Shiprocket</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2.5">
-                <span className="text-[#E02171] text-sm">🎁</span>
-                <div>
-                  <p className="font-bold text-gray-900">Thoughtful unboxing experience</p>
-                  <p className="text-[10px] text-gray-400">Because you deserve it! 💖</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2.5">
-                <span className="text-[#E02171] text-sm">✨</span>
-                <div>
-                  <p className="font-bold text-gray-900">A small business with a big heart</p>
-                  <p className="text-[10px] text-gray-400">Thank you for supporting independent! ✨</p>
-                </div>
-              </div>
+            <div className="w-full rounded-2xl overflow-hidden">
+              <img
+                src="/images/OrderingPage/ScrunchiefrillsCheckoutWhy.png"
+                alt="Why shop with Scrunchiefrills - Big scrunchie energy, a little box of joy, your own little universe"
+                className="w-full h-auto object-contain rounded-2xl"
+              />
             </div>
           </div>
 

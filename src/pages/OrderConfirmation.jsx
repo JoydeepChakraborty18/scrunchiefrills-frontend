@@ -26,7 +26,21 @@ const OrderConfirmation = () => {
   const navigate = useNavigate();
 
   // 1. Prioritize state passed directly from Checkout navigation; fallback to Firestore query on refresh
-  const [order, setOrder] = useState(location.state?.order || null);
+  // 1. Check router state -> then sessionStorage -> fallback to Firestore
+  const [order, setOrder] = useState(() => {
+    if (location.state?.order) {
+      try {
+        sessionStorage.setItem(`sf_order_${orderId}`, JSON.stringify(location.state.order));
+      } catch (e) {}
+      return location.state.order;
+    }
+    try {
+      const cached = sessionStorage.getItem(`sf_order_${orderId}`);
+      return cached ? JSON.parse(cached) : null;
+    } catch (e) {
+      return null;
+    }
+  });
   const [loading, setLoading] = useState(!location.state?.order);
 
   useEffect(() => {
@@ -437,8 +451,8 @@ const OrderConfirmation = () => {
         <div className="mt-14 pt-8 border-t border-pink-200 grid grid-cols-2 sm:grid-cols-5 gap-6 text-center">
           <div className="flex flex-col items-center">
             <Heart size={20} className="text-[#E02171] mb-1.5" />
-            <p className="text-xs font-black text-gray-900">Original, quirky designs</p>
-            <p className="text-[10px] text-gray-400 font-medium">Prints you won't find anywhere</p>
+            <p className="text-xs font-black text-gray-900">Adorable, quirky designs</p>
+            <p className="text-[10px] text-gray-400 font-medium">Cute and whimsical prints</p>
           </div>
 
           <div className="flex flex-col items-center">
