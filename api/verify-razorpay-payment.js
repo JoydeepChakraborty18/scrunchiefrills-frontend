@@ -68,7 +68,8 @@ export default async function handler(req, res) {
     });
   }
 
-  const secret = process.env.RAZORPAY_KEY_SECRET;
+  const secret = process.env.RAZORPAY_KEY_SECRET || process.env.VITE_RAZORPAY_KEY_SECRET || process.env.REACT_APP_RAZORPAY_KEY_SECRET;
+  
   if (!secret) {
     console.error("RAZORPAY_KEY_SECRET missing in server environment.");
     return res.status(500).json({ success: false, error: "Server authentication error." });

@@ -234,6 +234,35 @@ export default async function handler(reqOrEvent, resOrContext) {
     const availableCouriers =
       response?.data?.data?.available_courier_companies || [];
 
+      // ───────────────────────────────────────────────────────────
+    // 🔍 TERMINAL-ONLY SHIPROCKET DIAGNOSTIC INSPECTOR (VS Code)
+    // ───────────────────────────────────────────────────────────
+    console.log("\n=======================================================");
+    console.log(`🚚 SHIPROCKET RATE QUERY: ${pickupPinCode} ➔ ${cleanDeliveryPinCode}`);
+    console.log(`📦 Parcel Specs: ${safeWeight}kg | ${safeLength}x${safeBreadth}x${safeHeight} cm | Cart ₹${safeSubtotal}`);
+    console.log(`📍 Region: ${isWestBengal ? "West Bengal (Intra/State)" : "Rest of India"} | Threshold: ₹${freeShippingThreshold}`);
+    console.log(`🏢 Couriers Found by Shiprocket: ${availableCouriers.length}`);
+
+    if (availableCouriers.length > 0) {
+      console.table(
+        availableCouriers.map((c) => ({
+          Name: c.courier_name,
+          Type: c.is_surface ? "Surface" : "Air",
+          Rate: `₹${c.rate}`,
+          ETD_Hours: c.etd_hours || "N/A",
+          Est_Days: c.estimated_delivery_days || "N/A",
+          Rating: c.rating || "N/A",
+        }))
+      );
+    } else {
+      console.warn("⚠️ Shiprocket returned 0 available couriers for this route.");
+      if (response?.data?.data) {
+        console.log("Raw Response Metadata:", JSON.stringify(response.data.data, null, 2));
+      }
+    }
+    console.log("=======================================================\n");
+    // ───────────────────────────────────────────────────────────
+
     if (!availableCouriers.length) {
       return sendResponse(200, {
         serviceable: false,
