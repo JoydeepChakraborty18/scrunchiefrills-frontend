@@ -7,7 +7,6 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
-// 🛡️ Pre-launch audit guard
 const IS_PRODUCTION_LIVE = process.env.STORE_LIVE_STATUS === "TRUE";
 
 function getFormattedPrivateKey() {
@@ -38,18 +37,54 @@ try {
   console.warn("Firebase Admin Initialization Notice:", error.message);
 }
 
-export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method Not Allowed" });
+export default async function handler(reqOrEvent, resOrContext) {
+  const isExpress = typeof resOrContext?.status === "function";
+  const isWebStandard = typeof Response !== "undefined";
+
+  const corsHeaders = {
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
+
+  const sendResponse = (statusCode, payload) => {
+    if (isExpress) {
+      return resOrContext.status(statusCode).json(payload);
+    }
+    if (isWebStandard) {
+      return new Response(JSON.stringify(payload), {
+        status: statusCode,
+        headers: corsHeaders,
+      });
+    }
+    return {
+      statusCode,
+      headers: corsHeaders,
+      body: JSON.stringify(payload),
+    };
+  };
+
+  const method = reqOrEvent?.method || reqOrEvent?.httpMethod || "POST";
+
+  if (method === "OPTIONS") {
+    return sendResponse(200, {});
   }
 
-  let body = req.body;
-  if (typeof body === "string") {
-    try {
-      body = JSON.parse(body);
-    } catch {
-      return res.status(400).json({ error: "Invalid JSON format." });
+  if (method !== "POST") {
+    return sendResponse(405, { error: "Method Not Allowed" });
+  }
+
+  let body = {};
+  try {
+    if (typeof reqOrEvent?.json === "function") {
+      body = await reqOrEvent.json();
+    } else if (typeof reqOrEvent?.body === "string") {
+      body = JSON.parse(reqOrEvent.body);
+    } else if (reqOrEvent?.body) {
+      body = reqOrEvent.body;
     }
+  } catch {
+    return sendResponse(400, { error: "Invalid JSON format." });
   }
 
   const {
@@ -62,21 +97,24 @@ export default async function handler(req, res) {
   } = body || {};
 
   if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-    return res.status(400).json({ 
+    return sendResponse(400, { 
       success: false, 
       error: "Missing Razorpay verification parameters (order_id, payment_id, or signature)." 
     });
   }
 
-  const secret = process.env.RAZORPAY_KEY_SECRET || process.env.VITE_RAZORPAY_KEY_SECRET || process.env.REACT_APP_RAZORPAY_KEY_SECRET;
-  
+  const rawSecret = 
+    process.env.RAZORPAY_KEY_SECRET || 
+    process.env.VITE_RAZORPAY_KEY_SECRET || 
+    process.env.REACT_APP_RAZORPAY_KEY_SECRET;
+  const secret = rawSecret ? rawSecret.replace(/["'\s]/g, "").trim() : "";
+
   if (!secret) {
     console.error("RAZORPAY_KEY_SECRET missing in server environment.");
-    return res.status(500).json({ success: false, error: "Server authentication error." });
+    return sendResponse(500, { success: false, error: "Server authentication error." });
   }
 
   try {
-    // 🛡 1. Cryptographic Signature Verification (Timing-Safe)
     const hmac = crypto.createHmac("sha256", secret.trim());
     hmac.update(`${razorpay_order_id}|${razorpay_payment_id}`);
     const generatedSignature = hmac.digest("hex");
@@ -86,7 +124,7 @@ export default async function handler(req, res) {
 
     if (expectedBuffer.length !== receivedBuffer.length || !crypto.timingSafeEqual(expectedBuffer, receivedBuffer)) {
       console.error(`🚨 Payment Signature Tampering Attempt! Order: ${razorpay_order_id}`);
-      return res.status(400).json({ 
+      return sendResponse(400, { 
         success: false, 
         error: "Invalid payment signature. Transaction verification failed." 
       });
@@ -94,7 +132,6 @@ export default async function handler(req, res) {
 
     const orderDocId = `SF-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
-    // 🛡️ 2. Prevent Replay Attacks
     if (db) {
       const existingQuery = await db.collection("orders")
         .where("razorpayPaymentId", "==", razorpay_payment_id)
@@ -103,7 +140,7 @@ export default async function handler(req, res) {
 
       if (!existingQuery.empty) {
         const existingDoc = existingQuery.docs[0];
-        return res.status(200).json({
+        return sendResponse(200, {
           success: true,
           orderId: existingDoc.id,
           message: "Order already verified and recorded.",
@@ -113,7 +150,6 @@ export default async function handler(req, res) {
       const now = FieldValue.serverTimestamp();
       const batch = db.batch();
 
-      // 🛡️ 3. Atomic Database Commit: orders/{orderId}
       const normalizedOrderRecord = {
         orderId: orderDocId,
         razorpayOrderId: razorpay_order_id,
@@ -160,7 +196,6 @@ export default async function handler(req, res) {
       const orderRef = db.collection("orders").doc(orderDocId);
       batch.set(orderRef, normalizedOrderRecord);
 
-      // 👤 4. Atomic Database Commit & Reward Status Update: customers/{uid}
       const customerUid = customer.uid;
       if (customerUid && !customerUid.startsWith("guest")) {
         const customerRef = db.collection("customers").doc(customerUid);
@@ -185,7 +220,6 @@ export default async function handler(req, res) {
           updatedAt: now,
         };
 
-        // 🎟️ If a promotional reward code was used, mark it as "used" to prevent reuse
         if (pricing.discountCode && customerSnap.exists) {
           const customerData = customerSnap.data();
           const existingRewards = customerData.rewards || [];
@@ -208,7 +242,6 @@ export default async function handler(req, res) {
         batch.set(customerRef, customerUpdates, { merge: true });
       }
 
-      // 📦 5. Atomic Stock Decrement: products/{productId}
       if (IS_PRODUCTION_LIVE) {
         if (Array.isArray(items)) {
           for (const item of items) {
@@ -237,22 +270,19 @@ export default async function handler(req, res) {
             }
           }
         }
-      } else {
-        console.log("🛡️ Audit Mode: Inventory decrement skipped.");
       }
 
-      // Execute all document updates together atomically
       await batch.commit();
     }
 
-    return res.status(200).json({
+    return sendResponse(200, {
       success: true,
       orderId: orderDocId,
       message: "Payment verified and recorded successfully.",
     });
   } catch (err) {
     console.error("Verification Handler Error:", err);
-    return res.status(500).json({
+    return sendResponse(500, {
       success: false,
       error: "Internal server error during payment verification.",
     });
