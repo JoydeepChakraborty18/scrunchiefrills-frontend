@@ -9,7 +9,7 @@ import { X, Sparkles, ShieldAlert, Truck, CreditCard, RotateCcw, CheckCircle2 } 
  */
 
 // Define the actual date this legal agreement was reviewed and adopted
-const TERMS_LAST_UPDATED = "22 September 2026";
+const TERMS_LAST_UPDATED = "October 2026";
 
 const TermsModal = ({ isOpen, onClose, onAccept }) => {
   if (!isOpen) return null;
@@ -83,11 +83,11 @@ const TermsModal = ({ isOpen, onClose, onAccept }) => {
                 <RotateCcw size={15} className="text-[#E02171]" /> 2. Transit Damage & Replacement Guarantee
               </h3>
               <p className="text-gray-600 pl-5">
-                If your package arrives defective, crushed, or containing an incorrect item, we will happily issue an immediate replacement! To claim a replacement:
+                If your package arrives defective, crushed, or containing an incorrect item, we will happily issue a replacement! To claim a replacement:
               </p>
               <ul className="list-disc list-inside pl-7 text-gray-600 space-y-0.5 mt-1">
                 <li>You must record an <strong>unboxing video</strong> showing the outer parcel label and the opening of the package.</li>
-                <li>Contact our support team within <strong>48 hours</strong> of delivery with the video proof.</li>
+                <li>Contact our support team at <strong>hello@scrunchiefrills.com</strong> within <strong>48 hours</strong> of delivery with the video proof.</li>
               </ul>
             </div>
 

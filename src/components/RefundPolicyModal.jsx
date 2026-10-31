@@ -8,7 +8,7 @@ import { X, Sparkles, RefreshCw, ShieldAlert, CreditCard, Clock, CheckCircle2, M
  * Brand: Scrunchiefrills™
  * Tailored for: Razorpay Live Merchant Onboarding Compliance & Return Logistics
  */
-const REFUND_LAST_UPDATED = "03 October 2026";
+const REFUND_LAST_UPDATED = "October 2026";
 
 const RefundPolicyModal = ({ isOpen, onClose }) => {
   if (!isOpen) return null;

@@ -7,7 +7,7 @@ import { X, Sparkles, ShieldCheck, Lock, EyeOff, Server, HeartHandshake, CheckCi
  * Brand: Scrunchiefrills™
  * Aesthetic: Neo-Brutalist Soft-Pink Borders, Hyper-Feminine, Transparent & Legally Sound
  */
-const PRIVACY_LAST_UPDATED = "19 September 2026";
+const PRIVACY_LAST_UPDATED = "October 2026";
 
 const PrivacyModal = ({ isOpen, onClose, onAccept }) => {
   if (!isOpen) return null;

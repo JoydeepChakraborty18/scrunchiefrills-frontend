@@ -7,7 +7,7 @@ import { X, Sparkles, Truck, MapPin, Clock, ShieldCheck, CheckCircle2 } from "lu
  * Brand: Scrunchiefrills™
  * Tailored for: Razorpay Live Merchant Onboarding Compliance
  */
-const SHIPPING_LAST_UPDATED = "30 September 2026";
+const SHIPPING_LAST_UPDATED = "October 2026";
 
 const ShippingPolicyModal = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
@@ -105,7 +105,7 @@ const ShippingPolicyModal = ({ isOpen, onClose }) => {
                 <ShieldCheck size={15} className="text-[#E02171]" /> 4. Shipping Charges & Free Delivery Thresholds
               </h3>
               <ul className="list-disc list-inside pl-7 text-gray-600 space-y-1">
-                <li><strong>West Bengal Destinations (PIN 70xxxx–74xxxx):</strong> Free shipping on all orders valued at <strong>₹999 and above</strong>. Standard shipping is ₹50 for orders below ₹999.</li>
+                <li><strong>West Bengal Destinations (PIN 70xxxx–74xxxx):</strong> Free shipping on all orders valued at <strong>₹999 and above</strong>. Standard courier charges apply below this threshold (calculated dynamically at checkout).</li>
                 <li><strong>Inter-State / National Shipping:</strong> Free delivery on orders valued at <strong>₹1999 and above</strong>. Dynamically calculated surface/air shipping rates apply below this threshold based on volumetric weight.</li>
               </ul>
             </div>
