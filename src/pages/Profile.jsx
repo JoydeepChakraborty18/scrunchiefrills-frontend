@@ -385,6 +385,33 @@ const Profile = () => {
   const matchedAvatar = AVATAR_REGISTRY.find((a) => a.avatarId === selectedAvatarId) || AVATAR_REGISTRY[1];
   const avatarImageSrc = profileData?.customAvatarUrl || matchedAvatar.image;
 
+  // 🗓️ Compute dynamic join date from Firebase Auth or Firestore
+  const memberSince = (() => {
+    try {
+      // 1. Try Firebase Auth creationTime
+      if (currentUser?.metadata?.creationTime) {
+        const authDate = new Date(currentUser.metadata.creationTime);
+        if (!isNaN(authDate.getTime())) {
+          return authDate.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+        }
+      }
+
+      // 2. Fallback to Firestore createdAt timestamp
+      const firestoreTimestamp = profileData?.createdAt;
+      if (firestoreTimestamp?.toDate) {
+        return firestoreTimestamp.toDate().toLocaleDateString("en-US", { month: "short", year: "numeric" });
+      } else if (firestoreTimestamp) {
+        const d = new Date(firestoreTimestamp);
+        if (!isNaN(d.getTime())) {
+          return d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+        }
+      }
+    } catch (e) {
+      console.warn("Could not parse member creation date:", e);
+    }
+    return "Nov 2026";
+  })();
+
   return (
     <div className="min-h-screen w-full bg-[#FFF2F8] text-gray-800 font-sans pt-24 sm:pt-28 pb-28 selection:bg-pink-200">
       {/* 🖥️ Wide Full-Canvas Responsive Container */}
@@ -429,9 +456,9 @@ const Profile = () => {
                       ✓ VERIFIED SCRUNCHIEFRILLER
                     </span>
                   </div>
-
+                  {/* AFTER (Dynamic date): */}
                   <p className="text-[11px] text-gray-400 font-semibold flex items-center gap-1 pt-0.5">
-                    📅 Scrunchiefriller since Sept 2026
+                    📅 Scrunchiefriller since {memberSince}
                   </p>
 
                   <div className="pt-2">
