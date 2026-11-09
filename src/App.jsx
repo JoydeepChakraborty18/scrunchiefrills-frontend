@@ -85,14 +85,6 @@ function Layout() {
       
       {/* 🌸 UNIFIED STICKY HEADER STACK (Fixes Marquee overlap on Desktop) */}
       <header className="w-full sticky top-0 z-50 flex flex-col">
-        {/* 🛡️ SHIELD 3: Prominent Pre-Launch Header Banner (Compliance & Legal Clarity) */}
-        <div className="w-full bg-[#E02171] text-white text-[11px] sm:text-xs font-bold py-2 px-4 text-center tracking-wide flex items-center justify-center gap-2 shadow-xs">
-          <span>🎀</span>
-          <span>
-            <strong>PRE-LAUNCH AUDIT PREVIEW:</strong> Official store orders open <strong>after Razorpay audit is successful</strong>! Feel free to explore our collection.
-          </span>
-          <span>✨</span>
-        </div>
 
         {/* 🌸 Infinite Scrolling Announcement Ticker */}
         {isMainSite && <MarqueeBar />}
